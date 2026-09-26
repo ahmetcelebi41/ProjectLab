@@ -1,4 +1,4 @@
-import { RouteScreen } from '@/components/navigation/RouteScreen';
+import { RouteScreen } from '@/components/shared/RouteScreen';
 
 export default function ProjectsScreen() {
   return <RouteScreen title="Projeler" description="Tüm projeler aynı dinamik route ve ortak ekran altyapısını kullanır." links={[

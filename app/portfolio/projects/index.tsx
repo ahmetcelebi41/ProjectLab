@@ -1,4 +1,4 @@
-import { RouteScreen } from '@/components/navigation/RouteScreen';
+import { RouteScreen } from '@/components/shared/RouteScreen';
 
 export default function PortfolioProjectsScreen() {
   return <RouteScreen title="Portföy Projeleri" description="Kişisel ilerleme verilerinden ayrılmış proje sunumları." links={[

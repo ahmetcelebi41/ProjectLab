@@ -1,4 +1,4 @@
-import { RouteScreen } from '@/components/navigation/RouteScreen';
+import { RouteScreen } from '@/components/shared/RouteScreen';
 
 export default function HomeScreen() {
   return <RouteScreen eyebrow="Kişisel Mod" title="Ana Sayfa" description="Devam Et, öne çıkan proje, öğrenme önerileri ve ilerleme özeti burada birleşir." links={[

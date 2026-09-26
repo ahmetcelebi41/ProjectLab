@@ -1,7 +1,7 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 
-import { stackScreenOptions } from '@/components/navigation/stackOptions';
+import { stackScreenOptions } from '@/components/shared/stackOptions';
 
 export default function RootLayout() {
   return (

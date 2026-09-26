@@ -1,5 +1,5 @@
 import { useLocalSearchParams } from 'expo-router';
-import { RouteScreen } from '@/components/navigation/RouteScreen';
+import { RouteScreen } from '@/components/shared/RouteScreen';
 
 export default function QuizScreen() {
   const { lessonId, quizId } = useLocalSearchParams<{ lessonId: string; quizId: string }>();
