@@ -11,7 +11,7 @@ import { Typography } from '@/components/ui/Typography';
 import { useProgressStore } from '@/stores/progressStore';
 import { colors, layout, radius, spacing } from '@/theme/tokens';
 
-import { countCorrectAnswers, getValidQuizAnswers, resolveQuiz } from './quizUtils';
+import { getQuizScore, getValidQuizAnswers, resolveQuiz } from './quizUtils';
 
 type Props = {
   lessonId?: string;
@@ -78,9 +78,10 @@ export function QuizResultScreen({ lessonId, quizId }: Props) {
     return <ResultState lessonId={lessonId} missingQuiz={false} />;
   }
 
-  const correctAnswerCount = countCorrectAnswers(quiz, validAnswers);
-  const incorrectAnswerCount = quiz.questions.length - correctAnswerCount;
-  const percentage = Math.round((correctAnswerCount / quiz.questions.length) * 100);
+  const { correctAnswerCount, incorrectAnswerCount, percentage } = getQuizScore(
+    quiz,
+    validAnswers,
+  );
   const answersByQuestionId = new Map(
     validAnswers.map((answer) => [answer.questionId, answer.selectedOptionId]),
   );

@@ -2,6 +2,12 @@ import { getLessonById } from '@/data/lessons';
 import { getQuizById } from '@/data/quizzes';
 import type { Quiz, QuizAnswer } from '@/types';
 
+export type QuizScore = Readonly<{
+  correctAnswerCount: number;
+  incorrectAnswerCount: number;
+  percentage: number;
+}>;
+
 export function resolveQuiz(lessonId?: string, quizId?: string): Quiz | undefined {
   if (!lessonId || !quizId) return undefined;
 
@@ -25,6 +31,16 @@ export function countCorrectAnswers(quiz: Quiz, answers: readonly QuizAnswer[]):
     (total, question) => total + Number(answersByQuestionId.get(question.id) === question.correctOptionId),
     0,
   );
+}
+
+export function getQuizScore(quiz: Quiz, answers: readonly QuizAnswer[]): QuizScore {
+  const correctAnswerCount = countCorrectAnswers(quiz, answers);
+
+  return {
+    correctAnswerCount,
+    incorrectAnswerCount: quiz.questions.length - correctAnswerCount,
+    percentage: Math.round((correctAnswerCount / quiz.questions.length) * 100),
+  };
 }
 
 export function getValidQuizAnswers(quiz: Quiz, answers: readonly QuizAnswer[]): QuizAnswer[] {
