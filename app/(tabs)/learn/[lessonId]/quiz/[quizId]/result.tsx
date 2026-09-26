@@ -1,5 +1,17 @@
-import { RouteScreen } from '@/components/shared/RouteScreen';
+import { useLocalSearchParams } from 'expo-router';
+
+import { QuizResultScreen as QuizResult } from '@/features/quiz/QuizResultScreen';
 
 export default function QuizResultScreen() {
-  return <RouteScreen eyebrow="Quiz Sonucu" title="Sonuç" description="Doğru sayısı, açıklamalar, XP ve tekrar deneme aksiyonları burada gösterilir." />;
+  const { lessonId, quizId } = useLocalSearchParams<{
+    lessonId?: string | string[];
+    quizId?: string | string[];
+  }>();
+
+  return (
+    <QuizResult
+      lessonId={Array.isArray(lessonId) ? lessonId[0] : lessonId}
+      quizId={Array.isArray(quizId) ? quizId[0] : quizId}
+    />
+  );
 }

@@ -1,7 +1,17 @@
 import { useLocalSearchParams } from 'expo-router';
-import { RouteScreen } from '@/components/shared/RouteScreen';
+
+import { QuizFlowScreen } from '@/features/quiz/QuizFlowScreen';
 
 export default function QuizScreen() {
-  const { lessonId, quizId } = useLocalSearchParams<{ lessonId: string; quizId: string }>();
-  return <RouteScreen eyebrow={lessonId} title={`Quiz: ${quizId}`} description="3–5 soruluk mini quiz akışının route giriş noktası." links={[{ label: 'Örnek sonucu gör', href: `/learn/${lessonId}/quiz/${quizId}/result` }]} />;
+  const { lessonId, quizId } = useLocalSearchParams<{
+    lessonId?: string | string[];
+    quizId?: string | string[];
+  }>();
+
+  return (
+    <QuizFlowScreen
+      lessonId={Array.isArray(lessonId) ? lessonId[0] : lessonId}
+      quizId={Array.isArray(quizId) ? quizId[0] : quizId}
+    />
+  );
 }
