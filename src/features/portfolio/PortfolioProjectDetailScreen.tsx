@@ -1,4 +1,3 @@
-import type { Href } from 'expo-router';
 import { router } from 'expo-router';
 import { Linking, StyleSheet, useWindowDimensions, View } from 'react-native';
 
