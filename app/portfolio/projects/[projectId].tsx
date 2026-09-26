@@ -1,7 +1,8 @@
 import { useLocalSearchParams } from 'expo-router';
-import { RouteScreen } from '@/components/shared/RouteScreen';
+import { PortfolioProjectDetailScreen } from '@/features/portfolio/PortfolioProjectDetailScreen';
 
-export default function PortfolioProjectScreen() {
-  const { projectId } = useLocalSearchParams<{ projectId: string }>();
-  return <RouteScreen eyebrow="Portföy Projesi" title={projectId.toUpperCase()} description="Problem, çözüm, teknolojiler, süreç, sonuç ve öğrenilenler." />;
+export default function PortfolioProjectRoute() {
+  const { projectId } = useLocalSearchParams<{ projectId?: string | string[] }>();
+  const normalizedProjectId = Array.isArray(projectId) ? projectId[0] : projectId;
+  return <PortfolioProjectDetailScreen projectId={normalizedProjectId} />;
 }

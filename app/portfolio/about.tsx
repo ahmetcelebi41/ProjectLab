@@ -1,2 +1,5 @@
-import { RouteScreen } from '@/components/shared/RouteScreen';
-export default function PortfolioAboutScreen() { return <RouteScreen title="Hakkımda" description="Kısa profil, çalışma yaklaşımı, ana teknolojiler ve dış bağlantılar." />; }
+import { PortfolioAboutScreen } from '@/features/portfolio/PortfolioAboutScreen';
+
+export default function PortfolioAboutRoute() {
+  return <PortfolioAboutScreen />;
+}
