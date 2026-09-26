@@ -1,5 +1,3 @@
-import { RouteScreen } from '@/components/shared/RouteScreen';
+import { LearnScreen } from '@/features/learn/LearnScreen';
 
-export default function LearnScreen() {
-  return <RouteScreen title="Öğren" description="Gerçek projelerden üretilen öğrenme kartları ve mini quizler." links={[{ label: 'Design Token konusu', href: '/learn/design-tokens' }]} />;
-}
+export default LearnScreen;
