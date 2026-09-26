@@ -28,7 +28,10 @@ function QuizLoading() {
     <Screen
       contentContainerStyle={[styles.readingColumn, styles.screen]}
       edges={['top', 'bottom']}
-      scrollViewProps={{ accessibilityLabel: 'Quiz yükleniyor' }}
+      scrollViewProps={{
+        accessibilityLabel: 'Quiz yükleniyor',
+        accessibilityState: { busy: true },
+      }}
     >
       <View style={styles.header}>
         <View style={[styles.skeleton, styles.loadingBadge]} />
@@ -83,6 +86,7 @@ function QuestionOption({
   selected: boolean;
   onSelect: () => void;
 }) {
+  const [focused, setFocused] = useState(false);
   const correct = option.id === question.correctOptionId;
   const incorrectSelection = checked && selected && !correct;
   const showCorrect = checked && correct;
@@ -93,9 +97,12 @@ function QuestionOption({
       accessibilityRole="radio"
       accessibilityState={{ checked: selected, disabled: checked }}
       disabled={checked}
+      onBlur={() => setFocused(false)}
+      onFocus={() => setFocused(true)}
       onPress={onSelect}
       style={({ pressed }) => [
         styles.option,
+        focused && styles.optionFocused,
         selected && styles.optionSelected,
         showCorrect && styles.optionCorrect,
         incorrectSelection && styles.optionIncorrect,
@@ -375,6 +382,7 @@ const styles = StyleSheet.create({
   optionCorrect: { borderColor: colors.success },
   optionIncorrect: { borderColor: colors.error },
   optionPressed: { backgroundColor: colors.surfaceRaised },
+  optionFocused: { borderColor: colors.primaryHover },
   optionLabel: { flex: 1, lineHeight: spacing.xl },
   radio: {
     alignItems: 'center',

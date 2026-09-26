@@ -1,6 +1,6 @@
 import type { Href } from 'expo-router';
 import { router } from 'expo-router';
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Button } from '@/components/ui/Button';
@@ -20,6 +20,8 @@ export function PortfolioShell({ activeRoute, children }: {
   activeRoute?: PortfolioRoute;
   children: ReactNode;
 }) {
+  const [focusedControl, setFocusedControl] = useState<PortfolioRoute | 'brand' | null>(null);
+
   return (
     <Screen
       contentContainerStyle={styles.screen}
@@ -30,8 +32,10 @@ export function PortfolioShell({ activeRoute, children }: {
         <Pressable
           accessibilityLabel="Portföy ana sayfasına git"
           accessibilityRole="link"
+          onBlur={() => setFocusedControl(null)}
+          onFocus={() => setFocusedControl('brand')}
           onPress={() => router.push('/portfolio')}
-          style={({ pressed }) => [styles.brand, pressed && styles.pressed]}
+          style={({ pressed }) => [styles.brand, focusedControl === 'brand' && styles.focused, pressed && styles.pressed]}
         >
           <View aria-hidden style={styles.brandMark}>
             <Typography color="onPrimary" variant="button">PL</Typography>
@@ -50,10 +54,13 @@ export function PortfolioShell({ activeRoute, children }: {
                 accessibilityRole="tab"
                 accessibilityState={{ selected }}
                 key={item.id}
+                onBlur={() => setFocusedControl(null)}
+                onFocus={() => setFocusedControl(item.id)}
                 onPress={() => router.push(item.href)}
                 style={({ pressed }) => [
                   styles.navigationItem,
                   selected && styles.navigationItemSelected,
+                  focusedControl === item.id && styles.focused,
                   pressed && styles.pressed,
                 ]}
               >
@@ -101,14 +108,16 @@ const styles = StyleSheet.create({
   },
   brand: {
     alignItems: 'center',
+    borderColor: 'transparent',
     borderRadius: radius.md,
+    borderWidth: border.width,
     flexDirection: 'row',
     gap: spacing.sm,
     minHeight: sizing.touchTarget.minHeight,
   },
   brandMark: {
     alignItems: 'center',
-    backgroundColor: colors.primary,
+    backgroundColor: colors.primaryActive,
     borderRadius: radius.md,
     height: sizing.button.medium,
     justifyContent: 'center',
@@ -116,6 +125,9 @@ const styles = StyleSheet.create({
   },
   navigation: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
   navigationItem: {
+    borderColor: 'transparent',
+    borderRadius: radius.sm,
+    borderWidth: border.width,
     borderBottomColor: 'transparent',
     borderBottomWidth: border.width,
     justifyContent: 'center',
@@ -123,6 +135,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
   },
   navigationItemSelected: { borderBottomColor: colors.primary },
+  focused: { borderColor: colors.primaryHover },
   pressed: { opacity: border.width / 2 },
   content: { gap: spacing.max },
   footer: {

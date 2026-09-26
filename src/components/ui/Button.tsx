@@ -18,24 +18,24 @@ export type ButtonProps = Omit<PressableProps, 'children' | 'style'> & {
 };
 
 const variantStyles = StyleSheet.create({
-  primary: { backgroundColor: colors.primary, borderColor: colors.primary },
+  primary: { backgroundColor: colors.primaryActive, borderColor: colors.primaryActive },
   secondary: { backgroundColor: colors.surfaceRaised, borderColor: colors.border },
   ghost: { borderColor: colors.border },
-  destructive: { backgroundColor: colors.error, borderColor: colors.error },
-});
-
-const pressedVariantStyles = StyleSheet.create({
-  primary: { backgroundColor: colors.primaryActive, borderColor: colors.primaryActive },
-  secondary: { backgroundColor: colors.surface, borderColor: colors.primary },
-  ghost: { backgroundColor: colors.surfaceRaised, borderColor: colors.primary },
   destructive: { backgroundColor: colors.background, borderColor: colors.error },
 });
 
+const pressedVariantStyles = StyleSheet.create({
+  primary: { backgroundColor: colors.primaryActive, borderColor: colors.onPrimary },
+  secondary: { backgroundColor: colors.surface, borderColor: colors.primary },
+  ghost: { backgroundColor: colors.surfaceRaised, borderColor: colors.primary },
+  destructive: { backgroundColor: colors.surfaceRaised, borderColor: colors.error },
+});
+
 const hoverVariantStyles = StyleSheet.create({
-  primary: { backgroundColor: colors.primaryHover, borderColor: colors.primaryHover },
+  primary: { borderColor: colors.primaryHover },
   secondary: { borderColor: colors.primary },
   ghost: { backgroundColor: colors.surfaceRaised },
-  destructive: { borderColor: colors.onPrimary },
+  destructive: { backgroundColor: colors.surfaceRaised, borderColor: colors.error },
 });
 
 export function Button({
@@ -58,9 +58,11 @@ export function Button({
   const unavailable = disabled || loading;
   const foreground = disabled
     ? 'textMuted'
-    : variant === 'primary' || variant === 'destructive'
+    : variant === 'primary'
       ? 'onPrimary'
-      : 'text';
+      : variant === 'destructive'
+        ? 'error'
+        : 'text';
 
   return (
     <Pressable
@@ -98,7 +100,14 @@ export function Button({
       ]}
     >
       <View style={styles.content}>
-        {loading ? <ActivityIndicator color={colors[foreground]} size="small" /> : null}
+        {loading ? (
+          <ActivityIndicator
+            accessibilityElementsHidden
+            color={colors[foreground]}
+            importantForAccessibility="no"
+            size="small"
+          />
+        ) : null}
         <Typography color={foreground} numberOfLines={1} variant="button">
           {children}
         </Typography>

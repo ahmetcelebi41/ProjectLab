@@ -14,7 +14,7 @@ export type BadgeProps = {
 
 const variantColors = {
   neutral: colors.textSecondary,
-  primary: colors.primary,
+  primary: colors.primaryHover,
   success: colors.success,
   warning: colors.warning,
   error: colors.error,

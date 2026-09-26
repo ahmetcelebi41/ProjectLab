@@ -1,6 +1,6 @@
 import type { Href } from 'expo-router';
 import { router } from 'expo-router';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import { Badge, type BadgeVariant } from '@/components/ui/Badge';
@@ -13,6 +13,7 @@ import { achievementsById, lessons, projects, quizzes } from '@/data';
 import { getLevelProgress } from '@/features/progress/level';
 import { useProgressStore } from '@/stores/progressStore';
 import {
+  border,
   breakpoints,
   colors,
   layout,
@@ -40,6 +41,8 @@ function SectionHeading({ title, actionLabel, href }: {
   actionLabel?: string;
   href?: Href;
 }) {
+  const [focused, setFocused] = useState(false);
+
   return (
     <View style={styles.sectionHeading}>
       <Typography accessibilityRole="header" variant="h3">{title}</Typography>
@@ -48,8 +51,14 @@ function SectionHeading({ title, actionLabel, href }: {
           accessibilityLabel={actionLabel}
           accessibilityRole="link"
           hitSlop={spacing.xs}
+          onBlur={() => setFocused(false)}
+          onFocus={() => setFocused(true)}
           onPress={() => navigate(href)}
-          style={({ pressed }) => [styles.sectionAction, pressed && styles.sectionActionPressed]}
+          style={({ pressed }) => [
+            styles.sectionAction,
+            focused && styles.focusedControl,
+            pressed && styles.sectionActionPressed,
+          ]}
         >
           <Typography color="primary" variant="button">{actionLabel}</Typography>
         </Pressable>
@@ -63,7 +72,10 @@ function LoadingHome() {
     <Screen
       contentContainerStyle={styles.screen}
       edges={['top', 'bottom']}
-      scrollViewProps={{ accessibilityLabel: 'Ana Sayfa yükleniyor' }}
+      scrollViewProps={{
+        accessibilityLabel: 'Ana Sayfa yükleniyor',
+        accessibilityState: { busy: true },
+      }}
     >
       <View style={styles.loadingHeader}>
         <View style={[styles.skeleton, styles.loadingTitle]} />
@@ -318,6 +330,7 @@ function LatestAchievement() {
 
 export function HomeScreen() {
   const { width } = useWindowDimensions();
+  const [avatarFocused, setAvatarFocused] = useState(false);
   const hasHydrated = useProgressStore((state) => state.hasHydrated);
   const totalXp = useProgressStore((state) => state.totalXp);
   const lessonProgress = useProgressStore((state) => state.lessons);
@@ -356,8 +369,14 @@ export function HomeScreen() {
         <Pressable
           accessibilityLabel="Profili aç"
           accessibilityRole="link"
+          onBlur={() => setAvatarFocused(false)}
+          onFocus={() => setAvatarFocused(true)}
           onPress={() => navigate('/profile')}
-          style={({ pressed }) => [styles.avatar, pressed && styles.avatarPressed]}
+          style={({ pressed }) => [
+            styles.avatar,
+            avatarFocused && styles.focusedControl,
+            pressed && styles.avatarPressed,
+          ]}
         >
           <Typography color="onPrimary" variant="button">PL</Typography>
         </Pressable>
@@ -418,14 +437,16 @@ const styles = StyleSheet.create({
   },
   avatar: {
     alignItems: 'center',
-    backgroundColor: colors.primary,
+    backgroundColor: colors.primaryActive,
+    borderColor: 'transparent',
+    borderWidth: border.width,
     borderRadius: radius.pill,
     height: sizing.button.large,
     justifyContent: 'center',
     width: sizing.button.large,
   },
   avatarPressed: {
-    backgroundColor: colors.primaryActive,
+    borderColor: colors.onPrimary,
   },
   levelCard: {
     gap: spacing.md,
@@ -510,8 +531,13 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   sectionAction: {
+    borderColor: 'transparent',
+    borderWidth: border.width,
     borderRadius: radius.sm,
     padding: spacing.xs,
+  },
+  focusedControl: {
+    borderColor: colors.primaryHover,
   },
   sectionActionPressed: {
     backgroundColor: colors.surfaceRaised,

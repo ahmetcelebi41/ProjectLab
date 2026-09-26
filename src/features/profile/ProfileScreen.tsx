@@ -61,7 +61,10 @@ function LoadingProfile() {
     <Screen
       contentContainerStyle={styles.screen}
       edges={['top', 'bottom']}
-      scrollViewProps={{ accessibilityLabel: 'Profil yükleniyor' }}
+      scrollViewProps={{
+        accessibilityLabel: 'Profil yükleniyor',
+        accessibilityState: { busy: true },
+      }}
     >
       <Card raised style={styles.profileCard}>
         <View style={[styles.skeleton, styles.loadingAvatar]} />
@@ -271,7 +274,7 @@ function AchievementGrid({ cardWidth, earnedIds }: {
               </Badge>
             </View>
             <View style={styles.cardCopy}>
-              <Typography color={earned ? 'text' : 'textSecondary'} variant="h4">
+              <Typography accessibilityRole="header" color={earned ? 'text' : 'textSecondary'} variant="h4">
                 {achievement.title}
               </Typography>
               <Typography color={earned ? 'textSecondary' : 'textMuted'} style={styles.bodyLine}>
@@ -432,7 +435,7 @@ const styles = StyleSheet.create({
   },
   avatar: {
     alignItems: 'center',
-    backgroundColor: colors.primary,
+    backgroundColor: colors.primaryActive,
     borderRadius: radius.pill,
     height: spacing.max,
     justifyContent: 'center',
@@ -509,7 +512,7 @@ const styles = StyleSheet.create({
   },
   achievementMark: {
     alignItems: 'center',
-    backgroundColor: colors.primary,
+    backgroundColor: colors.primaryActive,
     borderColor: colors.primary,
     borderRadius: radius.pill,
     borderWidth: border.width,

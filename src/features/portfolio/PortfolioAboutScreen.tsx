@@ -36,13 +36,13 @@ export function PortfolioAboutScreen() {
         <PortfolioSectionHeading eyebrow="Süreç" title="Çalışma Yaklaşımı" />
         <View style={styles.twoColumn}>
           <Card style={styles.approachCard}>
-            <Typography variant="h4">Kullanıcı ve ürün odağı</Typography>
+            <Typography accessibilityRole="header" variant="h4">Kullanıcı ve ürün odağı</Typography>
             <Typography color="textSecondary" style={styles.bodyLine}>
               İçerik hiyerarşisini, kullanım akışlarını ve kullanıcı dilini ürün kararlarının başlangıç noktası olarak ele alıyorum.
             </Typography>
           </Card>
           <Card style={styles.approachCard}>
-            <Typography variant="h4">Sürdürülebilir teknik yapı</Typography>
+            <Typography accessibilityRole="header" variant="h4">Sürdürülebilir teknik yapı</Typography>
             <Typography color="textSecondary" style={styles.bodyLine}>
               Ortak bileşenler, design tokenlar ve açık veri sözleşmeleriyle farklı ekranlarda tutarlı deneyimler kuruyorum.
             </Typography>
@@ -75,7 +75,7 @@ export function PortfolioAboutScreen() {
 
 const styles = StyleSheet.create({
   profileCard: { alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xl, padding: spacing.xxl },
-  monogram: { alignItems: 'center', backgroundColor: colors.primary, borderRadius: radius.md, height: spacing.max, justifyContent: 'center', width: spacing.max },
+  monogram: { alignItems: 'center', backgroundColor: colors.primaryActive, borderRadius: radius.md, height: spacing.max, justifyContent: 'center', width: spacing.max },
   profileCopy: { flex: 1, gap: spacing.sm, minWidth: layout.readingWidth.min / 3 },
   lead: { lineHeight: spacing.xl, maxWidth: layout.readingWidth.max },
   section: { gap: spacing.xl },

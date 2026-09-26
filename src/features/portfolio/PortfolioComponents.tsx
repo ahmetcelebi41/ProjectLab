@@ -1,5 +1,6 @@
 import type { Href } from 'expo-router';
 import { router } from 'expo-router';
+import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Badge, type BadgeVariant } from '@/components/ui/Badge';
@@ -55,6 +56,7 @@ export function ProjectVisual({ compact = false, project }: { compact?: boolean;
 }
 
 export function PortfolioProjectCard({ project, width }: { project: Project; width: number }) {
+  const [focused, setFocused] = useState(false);
   const status = statusDetails[project.status];
   const href = `/portfolio/projects/${project.id}` as Href;
 
@@ -63,8 +65,15 @@ export function PortfolioProjectCard({ project, width }: { project: Project; wid
       accessibilityHint="Portföy proje detayını açar"
       accessibilityLabel={`${project.title}, ${typeLabels[project.type]}, ${status.label}`}
       accessibilityRole="link"
+      onBlur={() => setFocused(false)}
+      onFocus={() => setFocused(true)}
       onPress={() => router.push(href)}
-      style={({ pressed }) => [styles.cardPressable, { width }, pressed && styles.pressed]}
+      style={({ pressed }) => [
+        styles.cardPressable,
+        { width },
+        focused && styles.focused,
+        pressed && styles.pressed,
+      ]}
     >
       <Card style={styles.projectCard}>
         <ProjectVisual compact project={project} />
@@ -123,7 +132,8 @@ const styles = StyleSheet.create({
   },
   visualCompact: { borderRadius: radius.md, minHeight: spacing.max + spacing.xxxxl, padding: spacing.lg },
   visualRule: { backgroundColor: colors.primary, borderRadius: radius.pill, height: spacing.xxs, width: spacing.max },
-  cardPressable: { borderRadius: radius.card },
+  cardPressable: { borderColor: 'transparent', borderRadius: radius.card, borderWidth: border.width },
+  focused: { borderColor: colors.primaryHover },
   pressed: { opacity: border.width / 2 },
   projectCard: { gap: spacing.lg, height: '100%', padding: spacing.sm },
   cardTop: { alignItems: 'flex-start', flexDirection: 'row', gap: spacing.sm, justifyContent: 'space-between' },

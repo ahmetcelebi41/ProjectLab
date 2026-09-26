@@ -95,7 +95,10 @@ function LoadingLearn() {
     <Screen
       contentContainerStyle={styles.screen}
       edges={['top', 'bottom']}
-      scrollViewProps={{ accessibilityLabel: 'Öğren sayfası yükleniyor' }}
+      scrollViewProps={{
+        accessibilityLabel: 'Öğren sayfası yükleniyor',
+        accessibilityState: { busy: true },
+      }}
     >
       <View style={styles.headerCopy}>
         <View style={[styles.skeleton, styles.loadingTitle]} />
@@ -244,6 +247,7 @@ function LessonCard({ lesson, progress, width }: {
   progress?: LessonProgress;
   width: number;
 }) {
+  const [focused, setFocused] = useState(false);
   const status = getLessonStatus(progress);
   const statusDetail = statusDetails[status];
   const projectNames = lesson.projectIds.map((id) => projectsById[id].title).join(', ');
@@ -253,8 +257,10 @@ function LessonCard({ lesson, progress, width }: {
       accessibilityHint="Ders detayını açar"
       accessibilityLabel={`${lesson.title}, ${statusDetail.label}, ${projectNames} projesine bağlı, ${lesson.durationMinutes} dakika, ${lesson.completionXp} XP`}
       accessibilityRole="link"
+      onBlur={() => setFocused(false)}
+      onFocus={() => setFocused(true)}
       onPress={() => router.push(lessonHref(lesson))}
-      style={({ pressed }) => [styles.cardPressable, { width }, pressed && styles.cardPressed]}
+      style={({ pressed }) => [styles.cardPressable, { width }, focused && styles.focusedControl, pressed && styles.cardPressed]}
     >
       <Card style={styles.lessonCard}>
         <View style={styles.cardTop}>
@@ -289,6 +295,7 @@ function LessonCard({ lesson, progress, width }: {
 }
 
 function ProjectLearningCard({ project, width }: { project: Project; width: number }) {
+  const [focusedLessonId, setFocusedLessonId] = useState<string | null>(null);
   const projectLessons = lessons.filter((lesson) =>
     lesson.projectIds.some((projectId) => projectId === project.id),
   );
@@ -310,8 +317,10 @@ function ProjectLearningCard({ project, width }: { project: Project; width: numb
             accessibilityLabel={`${project.title} projesinden ${lesson.title} dersini aç`}
             accessibilityRole="link"
             key={lesson.id}
+            onBlur={() => setFocusedLessonId(null)}
+            onFocus={() => setFocusedLessonId(lesson.id)}
             onPress={() => router.push(lessonHref(lesson))}
-            style={({ pressed }) => [styles.projectLessonLink, pressed && styles.linkPressed]}
+            style={({ pressed }) => [styles.projectLessonLink, focusedLessonId === lesson.id && styles.focusedControl, pressed && styles.linkPressed]}
           >
             <Typography color="primary" style={styles.projectLessonTitle} variant="button">
               {lesson.title}
@@ -466,7 +475,7 @@ const styles = StyleSheet.create({
   filterRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
   filterButton: { borderRadius: radius.pill },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md },
-  cardPressable: { borderRadius: radius.card },
+  cardPressable: { borderColor: 'transparent', borderRadius: radius.card, borderWidth: border.width },
   cardPressed: { backgroundColor: colors.surfaceRaised },
   lessonCard: { gap: spacing.lg, height: '100%' },
   cardTop: { alignItems: 'flex-start', flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, justifyContent: 'space-between' },
@@ -479,7 +488,8 @@ const styles = StyleSheet.create({
   projectCard: { gap: spacing.md },
   projectMonogram: { alignItems: 'center', backgroundColor: colors.surfaceRaised, borderColor: colors.border, borderRadius: radius.md, borderWidth: border.width, height: sizing.button.large, justifyContent: 'center', width: sizing.button.large },
   projectLessonList: { borderTopColor: colors.border, borderTopWidth: border.width, paddingTop: spacing.xs },
-  projectLessonLink: { alignItems: 'center', flexDirection: 'row', gap: spacing.sm, justifyContent: 'space-between', minHeight: sizing.touchTarget.minHeight },
+  projectLessonLink: { alignItems: 'center', borderColor: 'transparent', borderRadius: radius.sm, borderWidth: border.width, flexDirection: 'row', gap: spacing.sm, justifyContent: 'space-between', minHeight: sizing.touchTarget.minHeight },
+  focusedControl: { borderColor: colors.primaryHover },
   projectLessonTitle: { flex: 1 },
   linkPressed: { backgroundColor: colors.surfaceRaised },
   emptyState: { alignItems: 'flex-start', gap: spacing.md, padding: spacing.xl },

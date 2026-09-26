@@ -52,7 +52,7 @@ export function PortfolioHomeScreen() {
         </View>
         <Card raised style={styles.heroPanel}>
           <Typography color="textMuted" variant="caption">PORTFÖY ODAĞI</Typography>
-          <Typography variant="h2">Ürün · Tasarım · Geliştirme</Typography>
+          <Typography accessibilityRole="header" variant="h2">Ürün · Tasarım · Geliştirme</Typography>
           <Typography color="textSecondary" style={styles.bodyLine}>
             Kurumsal web deneyimlerinden yönetim panellerine ve mobil ürün keşfine uzanan gerçek proje çalışmaları.
           </Typography>
@@ -107,7 +107,7 @@ export function PortfolioHomeScreen() {
         <PortfolioSectionHeading eyebrow="Kısa profil" title="Hakkımda" />
         <Card raised style={styles.aboutCard}>
           <View style={styles.aboutCopy}>
-            <Typography variant="h3">ProjectLab Geliştiricisi</Typography>
+            <Typography accessibilityRole="header" variant="h3">ProjectLab Geliştiricisi</Typography>
             <Typography color="textSecondary" style={styles.bodyLine} variant="bodyLarge">
               Gerçek projeler üzerinden öğreniyor, üretiyor ve ürün geliştirme sürecini görünür kılıyor.
             </Typography>

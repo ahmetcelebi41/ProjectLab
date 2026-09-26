@@ -89,7 +89,10 @@ function LoadingProjects() {
     <Screen
       contentContainerStyle={styles.screen}
       edges={['top', 'bottom']}
-      scrollViewProps={{ accessibilityLabel: 'Projeler yükleniyor' }}
+      scrollViewProps={{
+        accessibilityLabel: 'Projeler yükleniyor',
+        accessibilityState: { busy: true },
+      }}
     >
       <View style={styles.headerCopy}>
         <View style={[styles.skeleton, styles.loadingTitle]} />
@@ -162,6 +165,7 @@ function ProjectCard({ project, progress, width }: {
   progress?: ProjectProgress;
   width: number;
 }) {
+  const [focused, setFocused] = useState(false);
   const status = statusDetails[project.status];
   const progressValue = getProgressValue(project, progress);
   const activeStageId = progress?.activeStageId ?? project.currentStageId;
@@ -174,8 +178,15 @@ function ProjectCard({ project, progress, width }: {
       accessibilityHint="Proje genel bakışını açar"
       accessibilityLabel={`${project.title}, ${status.label}, yüzde ${progressValue} tamamlandı`}
       accessibilityRole="link"
+      onBlur={() => setFocused(false)}
+      onFocus={() => setFocused(true)}
       onPress={() => router.push(href)}
-      style={({ pressed }) => [styles.cardPressable, { width }, pressed && styles.cardPressed]}
+      style={({ pressed }) => [
+        styles.cardPressable,
+        { width },
+        focused && styles.cardFocused,
+        pressed && styles.cardPressed,
+      ]}
     >
       <Card style={styles.projectCard}>
         <ProjectCover project={project} />
@@ -318,7 +329,8 @@ const styles = StyleSheet.create({
   filterRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
   filterButton: { borderRadius: radius.pill },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md },
-  cardPressable: { borderRadius: radius.card },
+  cardPressable: { borderColor: 'transparent', borderRadius: radius.card, borderWidth: border.width },
+  cardFocused: { borderColor: colors.primaryHover },
   cardPressed: { opacity: border.width / 2 },
   projectCard: { gap: spacing.lg, height: '100%', padding: spacing.sm },
   cover: {

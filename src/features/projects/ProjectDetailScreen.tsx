@@ -75,7 +75,10 @@ function LoadingProjectDetail() {
     <Screen
       contentContainerStyle={styles.screen}
       edges={['top', 'bottom']}
-      scrollViewProps={{ accessibilityLabel: 'Proje detayı yükleniyor' }}
+      scrollViewProps={{
+        accessibilityLabel: 'Proje detayı yükleniyor',
+        accessibilityState: { busy: true },
+      }}
     >
       <View style={styles.heroColumns}>
         <View style={[styles.heroColumn, styles.loadingGroup]}>
@@ -162,8 +165,8 @@ function ProjectHero({ isWide, project }: { isWide: boolean; project: Project })
         </View>
         {liveLink || sourceLink ? (
           <View style={styles.actionRow}>
-            {liveLink ? <Button onPress={() => Linking.openURL(liveLink.url)} variant="secondary">{liveLink.label}</Button> : null}
-            {sourceLink ? <Button onPress={() => Linking.openURL(sourceLink.url)} variant="ghost">{sourceLink.label}</Button> : null}
+            {liveLink ? <Button accessibilityRole="link" onPress={() => Linking.openURL(liveLink.url)} variant="secondary">{liveLink.label}</Button> : null}
+            {sourceLink ? <Button accessibilityRole="link" onPress={() => Linking.openURL(sourceLink.url)} variant="ghost">{sourceLink.label}</Button> : null}
           </View>
         ) : null}
       </View>
@@ -436,8 +439,8 @@ function ProjectResult({ project }: { project: Project }) {
         </View>
         {liveLink || sourceLink ? (
           <View style={styles.actionRow}>
-            {liveLink ? <Button onPress={() => Linking.openURL(liveLink.url)}>{liveLink.label}</Button> : null}
-            {sourceLink ? <Button onPress={() => Linking.openURL(sourceLink.url)} variant="secondary">{sourceLink.label}</Button> : null}
+            {liveLink ? <Button accessibilityRole="link" onPress={() => Linking.openURL(liveLink.url)}>{liveLink.label}</Button> : null}
+            {sourceLink ? <Button accessibilityRole="link" onPress={() => Linking.openURL(sourceLink.url)} variant="secondary">{sourceLink.label}</Button> : null}
           </View>
         ) : null}
       </Card>

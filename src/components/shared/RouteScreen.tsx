@@ -1,5 +1,6 @@
 import type { Href } from 'expo-router';
 import { Link } from 'expo-router';
+import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Screen } from '@/components/ui/Screen';
@@ -10,6 +11,8 @@ type RouteLink = { label: string; href: Href };
 type RouteScreenProps = { eyebrow?: string; title: string; description: string; links?: RouteLink[] };
 
 export function RouteScreen({ eyebrow, title, description, links = [] }: RouteScreenProps) {
+  const [focusedHref, setFocusedHref] = useState<Href | null>(null);
+
   return (
     <Screen contentContainerStyle={styles.content}>
       <View style={styles.heading}>
@@ -21,7 +24,16 @@ export function RouteScreen({ eyebrow, title, description, links = [] }: RouteSc
         <View accessibilityRole="menu" style={styles.linkList}>
           {links.map((item) => (
             <Link key={item.label} href={item.href} asChild>
-              <Pressable accessibilityRole="link" style={({ pressed }) => [styles.link, pressed && styles.linkPressed]}>
+              <Pressable
+                accessibilityRole="link"
+                onBlur={() => setFocusedHref(null)}
+                onFocus={() => setFocusedHref(item.href)}
+                style={({ pressed }) => [
+                  styles.link,
+                  focusedHref === item.href && styles.linkFocused,
+                  pressed && styles.linkPressed,
+                ]}
+              >
                 <Typography numberOfLines={1} variant="button">{item.label}</Typography>
                 <Typography aria-hidden color="primary" variant="h3">→</Typography>
               </Pressable>
@@ -43,4 +55,5 @@ const styles = StyleSheet.create({
   linkList: { gap: spacing.md },
   link: { minHeight: sizing.touchTarget.minHeight, alignItems: 'center', flexDirection: 'row', gap: spacing.md, justifyContent: 'space-between', padding: spacing.md, backgroundColor: colors.surface, borderColor: colors.border, borderRadius: radius.card, borderWidth: border.width },
   linkPressed: { backgroundColor: colors.surfaceRaised },
+  linkFocused: { borderColor: colors.primaryHover },
 });

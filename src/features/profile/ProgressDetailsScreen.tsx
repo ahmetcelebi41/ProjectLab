@@ -47,7 +47,10 @@ function LoadingProgressDetails() {
     <Screen
       contentContainerStyle={styles.screen}
       edges={['bottom']}
-      scrollViewProps={{ accessibilityLabel: 'İlerleme yükleniyor' }}
+      scrollViewProps={{
+        accessibilityLabel: 'İlerleme yükleniyor',
+        accessibilityState: { busy: true },
+      }}
     >
       <View style={styles.heading}>
         <View style={[styles.skeleton, styles.loadingLabel]} />

@@ -15,7 +15,7 @@ function SettingRow({ description, label, value }: {
   return (
     <View accessibilityLabel={`${label}: ${value}. ${description}`} style={styles.settingRow}>
       <View style={styles.settingCopy}>
-        <Typography variant="h4">{label}</Typography>
+        <Typography accessibilityRole="header" variant="h4">{label}</Typography>
         <Typography color="textSecondary" style={styles.bodyLine}>{description}</Typography>
       </View>
       <Badge variant="neutral">{value}</Badge>

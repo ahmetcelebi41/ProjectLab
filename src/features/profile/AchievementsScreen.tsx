@@ -44,7 +44,10 @@ function LoadingAchievements() {
     <Screen
       contentContainerStyle={styles.screen}
       edges={['bottom']}
-      scrollViewProps={{ accessibilityLabel: 'Başarımlar yükleniyor' }}
+      scrollViewProps={{
+        accessibilityLabel: 'Başarımlar yükleniyor',
+        accessibilityState: { busy: true },
+      }}
     >
       <View style={styles.heading}>
         <View style={[styles.skeleton, styles.loadingLabel]} />
@@ -154,7 +157,7 @@ export function AchievementsScreen() {
                 </Badge>
               </View>
               <View style={styles.cardCopy}>
-                <Typography color={earned ? 'text' : 'textSecondary'} variant="h3">
+                <Typography accessibilityRole="header" color={earned ? 'text' : 'textSecondary'} variant="h3">
                   {achievement.title}
                 </Typography>
                 <Typography color={earned ? 'textSecondary' : 'textMuted'} style={styles.bodyLine}>
@@ -216,7 +219,7 @@ const styles = StyleSheet.create({
   },
   mark: {
     alignItems: 'center',
-    backgroundColor: colors.primary,
+    backgroundColor: colors.primaryActive,
     borderColor: colors.primary,
     borderRadius: radius.pill,
     borderWidth: border.width,

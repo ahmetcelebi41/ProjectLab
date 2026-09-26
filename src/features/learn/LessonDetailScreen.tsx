@@ -42,7 +42,10 @@ function LoadingLesson() {
     <Screen
       contentContainerStyle={[styles.readingColumn, styles.screen]}
       edges={['top', 'bottom']}
-      scrollViewProps={{ accessibilityLabel: 'Ders yükleniyor' }}
+      scrollViewProps={{
+        accessibilityLabel: 'Ders yükleniyor',
+        accessibilityState: { busy: true },
+      }}
     >
       <View style={styles.metaRow}>
         <View style={[styles.skeleton, styles.loadingBadge]} />

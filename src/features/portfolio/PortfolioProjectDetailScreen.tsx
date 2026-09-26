@@ -65,10 +65,10 @@ function ProjectHero({ project }: { project: Project }) {
         {project.links ? (
           <View style={styles.actionRow}>
             {project.links.live ? (
-              <Button onPress={() => Linking.openURL(project.links!.live!.url)} size="large">{project.links.live.label}</Button>
+              <Button accessibilityRole="link" onPress={() => Linking.openURL(project.links!.live!.url)} size="large">{project.links.live.label}</Button>
             ) : null}
             {project.links.source ? (
-              <Button onPress={() => Linking.openURL(project.links!.source!.url)} size="large" variant="secondary">
+              <Button accessibilityRole="link" onPress={() => Linking.openURL(project.links!.source!.url)} size="large" variant="secondary">
                 {project.links.source.label}
               </Button>
             ) : null}
@@ -112,7 +112,7 @@ function ContributionSection({ project }: { project: Project }) {
           <View key={stage.id} style={styles.contributionItem}>
             <View aria-hidden style={styles.bullet} />
             <View style={styles.contributionCopy}>
-              <Typography variant="h4">{stage.title}</Typography>
+              <Typography accessibilityRole="header" variant="h4">{stage.title}</Typography>
               <Typography color="textSecondary" style={styles.bodyLine}>{stage.summary}</Typography>
             </View>
           </View>
@@ -180,7 +180,7 @@ function GallerySection({ project }: { project: Project }) {
         </View>
       ) : (
         <Card style={styles.emptyState}>
-          <Typography variant="h4">Henüz galeri görseli yok</Typography>
+          <Typography accessibilityRole="header" variant="h4">Henüz galeri görseli yok</Typography>
           <Typography color="textSecondary">Bu proje için görseller eklendiğinde burada sunulacak.</Typography>
         </Card>
       )}

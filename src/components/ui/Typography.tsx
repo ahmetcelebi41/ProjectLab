@@ -19,6 +19,12 @@ const variantStyles = {
   button: typography.button,
 } as const;
 
+const accessibleTextColors = {
+  ...colors,
+  primary: colors.primaryHover,
+  textMuted: colors.textSecondary,
+} as const;
+
 export type TypographyVariant = keyof typeof variantStyles;
 
 export type TypographyProps = NativeTextProps & {
@@ -30,7 +36,7 @@ export function Typography({ color = 'text', style, variant = 'body', ...props }
   return (
     <NativeText
       {...props}
-      style={[styles.base, variantStyles[variant], { color: colors[color] }, style]}
+      style={[styles.base, variantStyles[variant], { color: accessibleTextColors[color] }, style]}
     />
   );
 }
