@@ -3,7 +3,7 @@ import { Link } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { colors, radius, spacing } from '@/theme/tokens';
+import { border, colors, layout, radius, spacing, typography } from '@/theme/tokens';
 
 type RouteLink = { label: string; href: Href };
 type RouteScreenProps = { eyebrow?: string; title: string; description: string; links?: RouteLink[] };
@@ -36,14 +36,19 @@ export function RouteScreen({ eyebrow, title, description, links = [] }: RouteSc
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: colors.background },
-  content: { flexGrow: 1, gap: spacing.xl, padding: spacing.lg },
-  heading: { gap: spacing.sm },
-  eyebrow: { color: colors.primary, fontSize: 13, fontWeight: '700', letterSpacing: 1.2, textTransform: 'uppercase' },
-  title: { color: colors.text, fontSize: 32, fontWeight: '800' },
-  description: { color: colors.textMuted, fontSize: 16, lineHeight: 24 },
+  content: {
+    flexGrow: 1,
+    gap: spacing.xxl,
+    paddingHorizontal: layout.horizontalPadding.mobile,
+    paddingVertical: spacing.xl,
+  },
+  heading: { gap: spacing.xs },
+  eyebrow: { color: colors.primary, ...typography.small, letterSpacing: 1.2, textTransform: 'uppercase' },
+  title: { color: colors.text, ...typography.h1 },
+  description: { color: colors.textSecondary, ...typography.bodyLarge, lineHeight: spacing.xl },
   linkList: { gap: spacing.md },
-  link: { minHeight: 56, alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: spacing.md, backgroundColor: colors.surface, borderColor: colors.border, borderRadius: radius.card, borderWidth: 1 },
+  link: { minHeight: 56, alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: spacing.md, backgroundColor: colors.surface, borderColor: colors.border, borderRadius: radius.card, borderWidth: border.width },
   linkPressed: { backgroundColor: colors.surfaceRaised },
-  linkLabel: { color: colors.text, fontSize: 16, fontWeight: '600' },
-  arrow: { color: colors.primary, fontSize: 22 },
+  linkLabel: { color: colors.text, ...typography.button },
+  arrow: { color: colors.primary, ...typography.h3 },
 });
