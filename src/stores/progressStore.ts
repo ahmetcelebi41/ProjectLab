@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
+import { achievements, lessonsById, quizzes, quizzesById } from '@/data';
+import { evaluateAchievements } from '@/features/achievements/evaluateAchievements';
 import {
   migrateProgressState,
   PROGRESS_STORAGE_KEY,
@@ -59,100 +61,123 @@ function replaceById<T>(
 
 export const useProgressStore = create<ProgressStore>()(
   persist(
-    (set) => ({
-      ...initialProgress,
-      hasHydrated: false,
+    (set, get) => {
+      const evaluateCurrentAchievements = () => {
+        const state = get();
+        if (!state.hasHydrated) return;
 
-      updateLessonProgress: (lessonId, update) => {
-        set((state) => {
-          const current = state.lessons.find((item) => item.lessonId === lessonId);
-          const next: LessonProgress = { ...current, ...update, lessonId };
+        const unlockedIds = evaluateAchievements(state, achievements, quizzes);
+        unlockedIds.forEach((achievementId) => get().unlockAchievement(achievementId));
+      };
 
-          return {
-            lessons: replaceById(state.lessons, (item) => item.lessonId === lessonId, next),
-          };
-        });
-      },
+      return {
+        ...initialProgress,
+        hasHydrated: false,
 
-      completeLesson: (lessonId, completedAt = new Date().toISOString()) => {
-        set((state) => {
-          const current = state.lessons.find((item) => item.lessonId === lessonId);
-          const next: LessonProgress = {
-            ...current,
-            lessonId,
-            completedAt: current?.completedAt ?? completedAt,
-          };
+        updateLessonProgress: (lessonId, update) => {
+          set((state) => {
+            const current = state.lessons.find((item) => item.lessonId === lessonId);
+            const next: LessonProgress = { ...current, ...update, lessonId };
 
-          return {
-            lessons: replaceById(state.lessons, (item) => item.lessonId === lessonId, next),
-          };
-        });
-      },
+            return {
+              lessons: replaceById(state.lessons, (item) => item.lessonId === lessonId, next),
+            };
+          });
+          evaluateCurrentAchievements();
+        },
 
-      saveQuizResult: (result) => {
-        set((state) => {
-          const current = state.quizzes.find((item) => item.quizId === result.quizId);
-          const next: QuizProgress = {
-            ...result,
-            answers: [
-              ...new Map(
-                result.answers.map((answer) => [answer.questionId, answer]),
-              ).values(),
-            ],
-            bestCorrectAnswerCount: Math.max(
-              current?.bestCorrectAnswerCount ?? 0,
-              result.bestCorrectAnswerCount,
-            ),
-            completedAt: current?.completedAt ?? result.completedAt,
-          };
+        completeLesson: (lessonId, completedAt = new Date().toISOString()) => {
+          set((state) => {
+            const current = state.lessons.find((item) => item.lessonId === lessonId);
+            if (current?.completedAt) return state;
 
-          return {
-            quizzes: replaceById(
-              state.quizzes,
-              (item) => item.quizId === result.quizId,
-              next,
-            ),
-          };
-        });
-      },
+            const next: LessonProgress = { ...current, lessonId, completedAt };
 
-      updateProjectProgress: (projectId, update) => {
-        set((state) => {
-          const current = state.projects.find((item) => item.projectId === projectId);
-          const next: ProjectProgress = {
-            ...current,
-            ...update,
-            projectId,
-            completedStageIds: update.completedStageIds
-              ? [...new Set(update.completedStageIds)]
-              : (current?.completedStageIds ?? []),
-          };
+            return {
+              totalXp: state.totalXp + lessonsById[lessonId].completionXp,
+              lessons: replaceById(state.lessons, (item) => item.lessonId === lessonId, next),
+            };
+          });
+          evaluateCurrentAchievements();
+        },
 
-          return {
-            projects: replaceById(
-              state.projects,
-              (item) => item.projectId === projectId,
-              next,
-            ),
-          };
-        });
-      },
+        saveQuizResult: (result) => {
+          set((state) => {
+            const current = state.quizzes.find((item) => item.quizId === result.quizId);
+            const isFirstCompletion = !current?.completedAt && Boolean(result.completedAt);
+            const next: QuizProgress = {
+              ...result,
+              answers: [
+                ...new Map(
+                  result.answers.map((answer) => [answer.questionId, answer]),
+                ).values(),
+              ],
+              bestCorrectAnswerCount: Math.max(
+                current?.bestCorrectAnswerCount ?? 0,
+                result.bestCorrectAnswerCount,
+              ),
+              completedAt: current?.completedAt ?? result.completedAt,
+            };
 
-      setTotalXp: (totalXp) => set({ totalXp }),
+            return {
+              totalXp: isFirstCompletion
+                ? state.totalXp + quizzesById[result.quizId].completionXp
+                : state.totalXp,
+              quizzes: replaceById(
+                state.quizzes,
+                (item) => item.quizId === result.quizId,
+                next,
+              ),
+            };
+          });
+          evaluateCurrentAchievements();
+        },
 
-      unlockAchievement: (achievementId) => {
-        set((state) => {
-          if (state.earnedAchievementIds.includes(achievementId)) return state;
+        updateProjectProgress: (projectId, update) => {
+          set((state) => {
+            const current = state.projects.find((item) => item.projectId === projectId);
+            const next: ProjectProgress = {
+              ...current,
+              ...update,
+              projectId,
+              completedStageIds: update.completedStageIds
+                ? [...new Set(update.completedStageIds)]
+                : (current?.completedStageIds ?? []),
+            };
 
-          return {
-            earnedAchievementIds: [...state.earnedAchievementIds, achievementId],
-          };
-        });
-      },
+            return {
+              projects: replaceById(
+                state.projects,
+                (item) => item.projectId === projectId,
+                next,
+              ),
+            };
+          });
+          evaluateCurrentAchievements();
+        },
 
-      resetProgress: () => set(initialProgress),
-      setHasHydrated: (hasHydrated) => set({ hasHydrated }),
-    }),
+        setTotalXp: (totalXp) => {
+          set({ totalXp });
+          evaluateCurrentAchievements();
+        },
+
+        unlockAchievement: (achievementId) => {
+          set((state) => {
+            if (state.earnedAchievementIds.includes(achievementId)) return state;
+
+            return {
+              earnedAchievementIds: [...state.earnedAchievementIds, achievementId],
+            };
+          });
+        },
+
+        resetProgress: () => set(initialProgress),
+        setHasHydrated: (hasHydrated) => {
+          set({ hasHydrated });
+          if (hasHydrated) evaluateCurrentAchievements();
+        },
+      };
+    },
     {
       name: PROGRESS_STORAGE_KEY,
       version: PROGRESS_STORAGE_VERSION,

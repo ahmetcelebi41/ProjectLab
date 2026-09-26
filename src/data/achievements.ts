@@ -37,18 +37,6 @@ export const achievements = [
     description: 'Bir quizde tüm soruları doğru yanıtla.',
     rule: { type: 'perfect-quizzes', count: 1 },
   },
-  {
-    id: 'journey-complete',
-    title: 'Yolculuk Tamamlandı',
-    description: 'Bir proje yolculuğunun tüm aşamalarını tamamla.',
-    rule: { type: 'completed-projects', count: 1 },
-  },
-  {
-    id: 'xp-250',
-    title: 'Deneyim Birikiyor',
-    description: 'Toplam 250 XP’ye ulaş.',
-    rule: { type: 'total-xp', amount: 250 },
-  },
 ] as const satisfies readonly Achievement[];
 
 export const achievementsById = {
@@ -58,11 +46,8 @@ export const achievementsById = {
   'lesson-collector': achievements[3],
   'first-quiz': achievements[4],
   'perfect-quiz': achievements[5],
-  'journey-complete': achievements[6],
-  'xp-250': achievements[7],
 } as const satisfies Readonly<Record<AchievementId, Achievement>>;
 
 export function getAchievementById(id: string): Achievement | undefined {
   return achievements.find((achievement) => achievement.id === id);
 }
-

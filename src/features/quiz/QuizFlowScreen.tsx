@@ -234,7 +234,6 @@ export function QuizFlowScreen({ lessonId, quizId }: Props) {
     submitting.current = true;
 
     const state = useProgressStore.getState();
-    const existing = state.quizzes.find((item) => item.quizId === quiz.id);
     const correctAnswerCount = countCorrectAnswers(quiz, selectedAnswers);
     const completedAt = new Date().toISOString();
 
@@ -245,10 +244,6 @@ export function QuizFlowScreen({ lessonId, quizId }: Props) {
       bestCorrectAnswerCount: correctAnswerCount,
       completedAt,
     });
-
-    if (!existing?.completedAt && quiz.completionXp > 0) {
-      useProgressStore.getState().setTotalXp(useProgressStore.getState().totalXp + quiz.completionXp);
-    }
 
     router.replace(`/learn/${quiz.lessonId}/quiz/${quiz.id}/result` as Href);
   };

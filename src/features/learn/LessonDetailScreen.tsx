@@ -199,14 +199,7 @@ function LessonActions({ completed, lesson }: { completed: boolean; lesson: Less
           accessibilityLabel={`${lesson.title} dersini tamamla`}
           disabled={completed}
           onPress={() => {
-            const state = useProgressStore.getState();
-            const alreadyCompleted = state.lessons.some(
-              (item) => item.lessonId === lesson.id && Boolean(item.completedAt),
-            );
-
-            if (alreadyCompleted) return;
-            state.completeLesson(lesson.id);
-            state.setTotalXp(state.totalXp + lesson.completionXp);
+            useProgressStore.getState().completeLesson(lesson.id);
           }}
           size="large"
           style={styles.actionButton}

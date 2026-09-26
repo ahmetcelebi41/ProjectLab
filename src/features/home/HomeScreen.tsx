@@ -10,6 +10,7 @@ import { Progress } from '@/components/ui/Progress';
 import { Screen } from '@/components/ui/Screen';
 import { Typography } from '@/components/ui/Typography';
 import { achievementsById, lessons, projects, quizzes } from '@/data';
+import { getLevelProgress } from '@/features/progress/level';
 import { useProgressStore } from '@/stores/progressStore';
 import {
   breakpoints,
@@ -20,8 +21,6 @@ import {
   spacing,
 } from '@/theme/tokens';
 import type { Lesson, Project, ProjectStatus } from '@/types';
-
-const XP_PER_LEVEL = 100;
 
 const projectStatus: Record<
   ProjectStatus,
@@ -81,8 +80,7 @@ function LoadingHome() {
 }
 
 function LevelSummary({ totalXp }: { totalXp: number }) {
-  const level = Math.floor(totalXp / XP_PER_LEVEL) + 1;
-  const levelXp = totalXp % XP_PER_LEVEL;
+  const { level, progressPercentage, xpToNextLevel } = getLevelProgress(totalXp);
 
   return (
     <Card accessibilityLabel={`Seviye ${level}, toplam ${totalXp} XP`} style={styles.levelCard}>
@@ -94,13 +92,13 @@ function LevelSummary({ totalXp }: { totalXp: number }) {
         <View style={styles.xpText}>
           <Typography variant="h4">{totalXp} XP</Typography>
           <Typography color="textMuted" variant="caption">
-            Sonraki seviyeye {XP_PER_LEVEL - levelXp} XP
+            Sonraki seviyeye {xpToNextLevel} XP
           </Typography>
         </View>
       </View>
       <Progress
-        accessibilityLabel={`Seviye ${level} ilerlemesi yüzde ${levelXp}`}
-        value={levelXp}
+        accessibilityLabel={`Seviye ${level} ilerlemesi yüzde ${progressPercentage}`}
+        value={progressPercentage}
       />
     </Card>
   );

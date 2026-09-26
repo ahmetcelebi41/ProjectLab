@@ -1,5 +1,6 @@
 import type { Href } from 'expo-router';
 import { router } from 'expo-router';
+import { useEffect } from 'react';
 import { Linking, StyleSheet, useWindowDimensions, View } from 'react-native';
 import type { DimensionValue } from 'react-native';
 
@@ -449,6 +450,12 @@ export function ProjectDetailScreen({ projectId }: Props) {
   const project = projectId ? getProjectById(projectId) : undefined;
   const hasHydrated = useProgressStore((state) => state.hasHydrated);
   const storedProgress = useProgressStore((state) => state.projects);
+  const updateProjectProgress = useProgressStore((state) => state.updateProjectProgress);
+
+  useEffect(() => {
+    if (!hasHydrated || !project) return;
+    updateProjectProgress(project.id, { lastVisitedAt: new Date().toISOString() });
+  }, [hasHydrated, project, updateProjectProgress]);
 
   if (!project) return <ProjectNotFound projectId={projectId} />;
   if (!hasHydrated) return <LoadingProjectDetail />;
