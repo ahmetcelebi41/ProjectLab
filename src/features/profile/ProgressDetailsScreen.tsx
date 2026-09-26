@@ -7,6 +7,7 @@ import { Screen } from '@/components/ui/Screen';
 import { Typography } from '@/components/ui/Typography';
 import { lessons, projects, quizzes } from '@/data';
 import { getLevelProgress, XP_PER_LEVEL } from '@/features/progress/level';
+import { getActiveProjectStageId, getCompletedProjectStageIds } from '@/features/progress/projectProgress';
 import { getValidQuizAnswers } from '@/features/quiz/quizUtils';
 import { useProgressStore } from '@/stores/progressStore';
 import { border, breakpoints, colors, layout, radius, spacing } from '@/theme/tokens';
@@ -21,13 +22,6 @@ import type {
 
 function percentage(completed: number, total: number) {
   return total > 0 ? Math.round((completed / total) * 100) : 0;
-}
-
-function completedStageIds(project: Project, progress?: ProjectProgress) {
-  const projectStageIds = new Set(project.stages.map((stage) => stage.id));
-  return new Set(
-    (progress?.completedStageIds ?? []).filter((stageId) => projectStageIds.has(stageId)),
-  );
 }
 
 function ScreenHeading() {
@@ -134,7 +128,8 @@ function ProjectCard({ progress, project, width }: {
   project: Project;
   width: number;
 }) {
-  const completedIds = completedStageIds(project, progress);
+  const completedIds = new Set(getCompletedProjectStageIds(project));
+  const activeStageId = getActiveProjectStageId(project);
   const value = percentage(completedIds.size, project.stages.length);
 
   return (
@@ -156,7 +151,7 @@ function ProjectCard({ progress, project, width }: {
       <View style={styles.stageList}>
         {project.stages.map((stage) => {
           const completed = completedIds.has(stage.id);
-          const active = !completed && progress?.activeStageId === stage.id;
+          const active = !completed && activeStageId === stage.id;
           const status: { label: string; variant: BadgeVariant } = completed
             ? { label: 'Tamamlandı', variant: 'success' }
             : active
@@ -316,10 +311,9 @@ export function ProgressDetailsScreen() {
   const cardWidth = (contentWidth - spacing.md * (columns - 1)) / columns;
   const completedLessons = lessonProgress.filter((item) => item.completedAt).length;
   const completedQuizzes = quizProgress.filter((item) => item.completedAt).length;
-  const completedProjects = projects.filter((project) => {
-    const progress = projectProgress.find((item) => item.projectId === project.id);
-    return completedStageIds(project, progress).size === project.stages.length;
-  }).length;
+  const completedProjects = projects.filter(
+    (project) => getCompletedProjectStageIds(project).length === project.stages.length,
+  ).length;
 
   return (
     <Screen

@@ -13,19 +13,21 @@ import { Typography } from '@/components/ui/Typography';
 import { getLessonsByProjectId } from '@/data/lessons';
 import { getProjectById } from '@/data/projects';
 import { getQuizzesByProjectId } from '@/data/quizzes';
+import { getActiveProjectStageId, getCompletedProjectStageIds } from '@/features/progress/projectProgress';
 import { useProgressStore } from '@/stores/progressStore';
 import { border, breakpoints, colors, layout, radius, sizing, spacing } from '@/theme/tokens';
 import type {
   Lesson,
   Project,
-  ProjectProgress,
   ProjectStage,
   ProjectStageStatus,
   ProjectStatus,
   Quiz,
 } from '@/types';
 
-type Props = { projectId?: string };
+export type ProjectDetailSection = 'overview' | 'journey' | 'learn' | 'quiz';
+
+type Props = { projectId?: string; section?: ProjectDetailSection };
 
 const projectStatuses: Record<ProjectStatus, { label: string; variant: BadgeVariant }> = {
   planned: { label: 'Planlandı', variant: 'neutral' },
@@ -175,40 +177,43 @@ function ProjectHero({ isWide, project }: { isWide: boolean; project: Project })
   );
 }
 
-function ProjectNavigation({ project }: { project: Project }) {
+function ProjectNavigation({ activeSection, project }: {
+  activeSection: ProjectDetailSection;
+  project: Project;
+}) {
+  const items: readonly { id: ProjectDetailSection; label: string; href: Href }[] = [
+    { id: 'overview', label: 'Genel Bakış', href: `/projects/${project.id}` as Href },
+    { id: 'journey', label: 'Yolculuk', href: `/projects/${project.id}/journey` as Href },
+    { id: 'learn', label: 'Öğren', href: `/projects/${project.id}/learn` as Href },
+    { id: 'quiz', label: 'Quiz', href: `/projects/${project.id}/quiz` as Href },
+  ];
+
   return (
-    <View accessibilityLabel="Proje içi navigasyon" style={styles.navigationRow}>
-      <Button disabled size="small">Genel Bakış</Button>
-      <Button
-        accessibilityLabel={`${project.title} proje yolculuğunu aç`}
-        onPress={() => navigate(`/projects/${project.id}/journey` as Href)}
-        size="small"
-        variant="ghost"
-      >Yolculuk</Button>
-      <Button
-        accessibilityLabel={`${project.title} öğrenme içeriklerini aç`}
-        onPress={() => navigate(`/projects/${project.id}/learn` as Href)}
-        size="small"
-        variant="ghost"
-      >Öğren</Button>
-      <Button
-        accessibilityLabel={`${project.title} quizlerini aç`}
-        onPress={() => navigate(`/projects/${project.id}/quiz` as Href)}
-        size="small"
-        variant="ghost"
-      >Quiz</Button>
+    <View
+      accessibilityLabel="Proje içi navigasyon"
+      accessibilityRole="tablist"
+      style={styles.navigationRow}
+    >
+      {items.map((item) => (
+        <Button
+          accessibilityLabel={`${project.title} ${item.label} bölümünü aç`}
+          accessibilityRole="tab"
+          accessibilityState={{ selected: item.id === activeSection }}
+          key={item.id}
+          onPress={item.id === activeSection ? undefined : () => navigate(item.href)}
+          size="small"
+          variant={item.id === activeSection ? 'primary' : 'ghost'}
+        >
+          {item.label}
+        </Button>
+      ))}
     </View>
   );
 }
 
-function getCompletedStageIds(project: Project, progress?: ProjectProgress) {
-  return progress?.completedStageIds
-    ?? project.stages.filter((stage) => stage.status === 'completed').map((stage) => stage.id);
-}
-
-function ProgressSummary({ progress, project }: { progress?: ProjectProgress; project: Project }) {
-  const completedStageIds = getCompletedStageIds(project, progress);
-  const activeStageId = progress?.activeStageId ?? project.currentStageId;
+function ProgressSummary({ project }: { project: Project }) {
+  const completedStageIds = getCompletedProjectStageIds(project);
+  const activeStageId = getActiveProjectStageId(project);
   const activeStage = project.stages.find((stage) => stage.id === activeStageId);
   const completedStages = project.stages.filter((stage) => completedStageIds.includes(stage.id));
   const lastCompleted = [...completedStages].sort((left, right) => right.order - left.order)[0];
@@ -282,15 +287,18 @@ function StageDetails({ stage }: { stage: ProjectStage }) {
   );
 }
 
-function JourneyPreview({ progress, project }: { progress?: ProjectProgress; project: Project }) {
-  const completedIds = getCompletedStageIds(project, progress);
-  const activeId = progress?.activeStageId ?? project.currentStageId;
+function JourneyPreview({ project, showAllAction = true }: {
+  project: Project;
+  showAllAction?: boolean;
+}) {
+  const completedIds = getCompletedProjectStageIds(project);
+  const activeId = getActiveProjectStageId(project);
 
   return (
     <View style={styles.section}>
       <SectionHeading
-        actionHref={`/projects/${project.id}/journey` as Href}
-        actionLabel="Tüm Yolculuk"
+        actionHref={showAllAction ? `/projects/${project.id}/journey` as Href : undefined}
+        actionLabel={showAllAction ? 'Tüm Yolculuk' : undefined}
         description="Fikirden sonuca proje aşamaları ve önemli kararlar."
         title="Proje Yolculuğu"
       />
@@ -369,24 +377,30 @@ function QuizCard({ quiz, width }: { quiz: Quiz; width: DimensionValue }) {
         <Typography accessibilityRole="header" variant="h4">{quiz.title}</Typography>
         <Typography color="textSecondary" style={styles.bodyLine}>{quiz.summary}</Typography>
       </View>
-      <Button onPress={() => navigate(`/projects/${quiz.projectId}/quiz` as Href)} variant="secondary">
+      <Button
+        onPress={() => navigate(completed
+          ? `/learn/${quiz.lessonId}/quiz/${quiz.id}/result` as Href
+          : `/learn/${quiz.lessonId}/quiz/${quiz.id}` as Href)}
+        variant="secondary"
+      >
         {completed ? 'Sonucu İncele' : 'Quiz’e Git'}
       </Button>
     </Card>
   );
 }
 
-function LearningSection({ cardWidth, lessons, project, quizzes }: {
+function LearningSection({ cardWidth, lessons, project, quizzes, showAllAction = true }: {
   cardWidth: DimensionValue;
   lessons: readonly Lesson[];
   project: Project;
   quizzes: readonly Quiz[];
+  showAllAction?: boolean;
 }) {
   return (
     <View style={styles.section}>
       <SectionHeading
-        actionHref={`/projects/${project.id}/learn` as Href}
-        actionLabel="Tümünü Gör"
+        actionHref={showAllAction ? `/projects/${project.id}/learn` as Href : undefined}
+        actionLabel={showAllAction ? 'Tümünü Gör' : undefined}
         description="Projede karşılaşılan teknik ve tasarımsal konular."
         title="Öğrendiklerim"
       />
@@ -399,6 +413,31 @@ function LearningSection({ cardWidth, lessons, project, quizzes }: {
         <Card style={styles.emptyCard}>
           <Typography accessibilityRole="header" variant="h4">İçerik hazırlanıyor</Typography>
           <Typography color="textSecondary">Bu projeye bağlı öğrenme veya quiz kaydı henüz yok.</Typography>
+        </Card>
+      )}
+    </View>
+  );
+}
+
+function QuizSection({ cardWidth, project, quizzes }: {
+  cardWidth: DimensionValue;
+  project: Project;
+  quizzes: readonly Quiz[];
+}) {
+  return (
+    <View style={styles.section}>
+      <SectionHeading
+        description={`${project.title} projesinden üretilen kısa bilgi testleri.`}
+        title="Quizler"
+      />
+      {quizzes.length ? (
+        <View style={styles.grid}>
+          {quizzes.map((quiz) => <QuizCard key={quiz.id} quiz={quiz} width={cardWidth} />)}
+        </View>
+      ) : (
+        <Card style={styles.emptyCard}>
+          <Typography accessibilityRole="header" variant="h4">Henüz quiz yok</Typography>
+          <Typography color="textSecondary">Bu projeye bağlı quiz hazır olduğunda burada görünecek.</Typography>
         </Card>
       )}
     </View>
@@ -448,11 +487,10 @@ function ProjectResult({ project }: { project: Project }) {
   );
 }
 
-export function ProjectDetailScreen({ projectId }: Props) {
+export function ProjectDetailScreen({ projectId, section = 'overview' }: Props) {
   const { width } = useWindowDimensions();
   const project = projectId ? getProjectById(projectId) : undefined;
   const hasHydrated = useProgressStore((state) => state.hasHydrated);
-  const storedProgress = useProgressStore((state) => state.projects);
   const updateProjectProgress = useProgressStore((state) => state.updateProjectProgress);
 
   useEffect(() => {
@@ -471,8 +509,6 @@ export function ProjectDetailScreen({ projectId }: Props) {
   const cardWidth: DimensionValue = isWide
     ? (contentWidth - spacing.md) / layout.columns.wide.min
     : '100%';
-  const progress = storedProgress.find((item) => item.projectId === project.id);
-
   return (
     <Screen
       contentContainerStyle={styles.screen}
@@ -480,17 +516,40 @@ export function ProjectDetailScreen({ projectId }: Props) {
       scrollViewProps={{ contentInsetAdjustmentBehavior: 'automatic' }}
     >
       <ProjectHero isWide={isWide} project={project} />
-      <ProjectNavigation project={project} />
-      <ProgressSummary progress={progress} project={project} />
-      <JourneyPreview progress={progress} project={project} />
-      <LearningSection
-        cardWidth={cardWidth}
-        lessons={getLessonsByProjectId(project.id)}
-        project={project}
-        quizzes={getQuizzesByProjectId(project.id)}
-      />
-      <Technologies project={project} />
-      <ProjectResult project={project} />
+      <ProjectNavigation activeSection={section} project={project} />
+      {section === 'overview' ? (
+        <>
+          <ProgressSummary project={project} />
+          <JourneyPreview project={project} />
+          <LearningSection
+            cardWidth={cardWidth}
+            lessons={getLessonsByProjectId(project.id)}
+            project={project}
+            quizzes={getQuizzesByProjectId(project.id)}
+          />
+          <Technologies project={project} />
+          <ProjectResult project={project} />
+        </>
+      ) : null}
+      {section === 'journey' ? (
+        <JourneyPreview project={project} showAllAction={false} />
+      ) : null}
+      {section === 'learn' ? (
+        <LearningSection
+          cardWidth={cardWidth}
+          lessons={getLessonsByProjectId(project.id)}
+          project={project}
+          quizzes={[]}
+          showAllAction={false}
+        />
+      ) : null}
+      {section === 'quiz' ? (
+        <QuizSection
+          cardWidth={cardWidth}
+          project={project}
+          quizzes={getQuizzesByProjectId(project.id)}
+        />
+      ) : null}
     </Screen>
   );
 }

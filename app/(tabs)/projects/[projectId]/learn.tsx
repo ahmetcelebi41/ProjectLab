@@ -1,7 +1,10 @@
 import { useLocalSearchParams } from 'expo-router';
-import { RouteScreen } from '@/components/shared/RouteScreen';
+
+import { ProjectDetailScreen } from '@/features/projects/ProjectDetailScreen';
 
 export default function ProjectLearnScreen() {
-  const { projectId } = useLocalSearchParams<{ projectId: string }>();
-  return <RouteScreen eyebrow={projectId} title="Öğren" description="Bu projeden üretilen teknik ve tasarımsal öğrenme içerikleri." links={[{ label: 'Design Token konusu', href: '/learn/design-tokens' }]} />;
+  const { projectId } = useLocalSearchParams<{ projectId?: string | string[] }>();
+  const resolvedProjectId = Array.isArray(projectId) ? projectId[0] : projectId;
+
+  return <ProjectDetailScreen projectId={resolvedProjectId} section="learn" />;
 }

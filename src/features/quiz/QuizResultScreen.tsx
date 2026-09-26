@@ -8,6 +8,7 @@ import { Card } from '@/components/ui/Card';
 import { Progress } from '@/components/ui/Progress';
 import { Screen } from '@/components/ui/Screen';
 import { Typography } from '@/components/ui/Typography';
+import { getQuizAwardXp } from '@/features/progress/rewards';
 import { useProgressStore } from '@/stores/progressStore';
 import { colors, layout, radius, spacing } from '@/theme/tokens';
 
@@ -88,6 +89,8 @@ export function QuizResultScreen({ lessonId, quizId }: Props) {
   const incorrectQuestions = quiz.questions.filter(
     (question) => answersByQuestionId.get(question.id) !== question.correctOptionId,
   );
+  const awardedXp = savedProgress.awardedXp
+    ?? getQuizAwardXp(quiz, savedProgress.bestCorrectAnswerCount);
 
   return (
     <Screen
@@ -127,7 +130,7 @@ export function QuizResultScreen({ lessonId, quizId }: Props) {
             <Typography color="textSecondary">Yanlış</Typography>
           </View>
           <View style={styles.summaryItem}>
-            <Typography color="primary" variant="h3">+{quiz.completionXp}</Typography>
+            <Typography color="primary" variant="h3">+{awardedXp}</Typography>
             <Typography color="textSecondary">İlk tamamlama XP</Typography>
           </View>
         </View>

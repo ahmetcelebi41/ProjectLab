@@ -1,7 +1,10 @@
 import { useLocalSearchParams } from 'expo-router';
-import { RouteScreen } from '@/components/shared/RouteScreen';
+
+import { ProjectDetailScreen } from '@/features/projects/ProjectDetailScreen';
 
 export default function ProjectQuizScreen() {
-  const { projectId } = useLocalSearchParams<{ projectId: string }>();
-  return <RouteScreen eyebrow={projectId} title="Quiz" description="Projeden üretilen kısa bilgi testleri." links={[{ label: 'Örnek quizi başlat', href: '/learn/design-tokens/quiz/token-basics' }]} />;
+  const { projectId } = useLocalSearchParams<{ projectId?: string | string[] }>();
+  const resolvedProjectId = Array.isArray(projectId) ? projectId[0] : projectId;
+
+  return <ProjectDetailScreen projectId={resolvedProjectId} section="quiz" />;
 }

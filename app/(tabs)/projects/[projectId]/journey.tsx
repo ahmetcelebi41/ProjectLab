@@ -1,7 +1,10 @@
 import { useLocalSearchParams } from 'expo-router';
-import { RouteScreen } from '@/components/shared/RouteScreen';
+
+import { ProjectDetailScreen } from '@/features/projects/ProjectDetailScreen';
 
 export default function ProjectJourneyScreen() {
-  const { projectId } = useLocalSearchParams<{ projectId: string }>();
-  return <RouteScreen eyebrow={projectId} title="Yolculuk" description="Fikirden yayına proje aşamaları ve checkpoint’ler." />;
+  const { projectId } = useLocalSearchParams<{ projectId?: string | string[] }>();
+  const resolvedProjectId = Array.isArray(projectId) ? projectId[0] : projectId;
+
+  return <ProjectDetailScreen projectId={resolvedProjectId} section="journey" />;
 }

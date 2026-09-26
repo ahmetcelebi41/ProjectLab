@@ -11,6 +11,7 @@ import { Screen } from '@/components/ui/Screen';
 import { Typography } from '@/components/ui/Typography';
 import { achievementsById, lessons, projects, quizzes } from '@/data';
 import { getLevelProgress } from '@/features/progress/level';
+import { getCompletedProjectStageIds } from '@/features/progress/projectProgress';
 import { useProgressStore } from '@/stores/progressStore';
 import {
   border,
@@ -160,7 +161,7 @@ function ContinueCard() {
     const latestProject = projects.find((project) => project.id === latestProjectProgress?.projectId);
     const fallbackProject = projects.find((project) => project.status === 'in-progress') ?? projects[0];
     const project = latestProject ?? fallbackProject;
-    const activeStageId = latestProjectProgress?.activeStageId ?? project.currentStageId;
+    const activeStageId = project.currentStageId;
     const activeStage = project.stages.find((stage) => stage.id === activeStageId);
 
     return {
@@ -193,10 +194,7 @@ function ContinueCard() {
 }
 
 function ProjectCard({ project, width }: { project: Project; width: number }) {
-  const progress = useProgressStore((state) =>
-    state.projects.find((item) => item.projectId === project.id),
-  );
-  const completedStageCount = progress?.completedStageIds.length ?? 0;
+  const completedStageCount = getCompletedProjectStageIds(project).length;
   const progressValue = Math.round((completedStageCount / project.stages.length) * 100);
   const status = projectStatus[project.status];
 

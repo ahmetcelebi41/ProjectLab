@@ -7,8 +7,6 @@ export type ContentProgressStatus = 'not-started' | 'in-progress' | 'completed';
 
 export type ProjectProgress = Readonly<{
   projectId: ProjectId;
-  completedStageIds: readonly string[];
-  activeStageId?: string;
   lastVisitedAt?: string;
 }>;
 
@@ -28,6 +26,7 @@ export type QuizProgress = Readonly<{
   currentQuestionIndex: number;
   answers: readonly QuizAnswer[];
   bestCorrectAnswerCount: number;
+  awardedXp?: number;
   completedAt?: string;
 }>;
 
@@ -38,4 +37,3 @@ export type Progress = Readonly<{
   quizzes: readonly QuizProgress[];
   earnedAchievementIds: readonly AchievementId[];
 }>;
-

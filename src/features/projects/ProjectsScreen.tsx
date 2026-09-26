@@ -10,6 +10,7 @@ import { Progress } from '@/components/ui/Progress';
 import { Screen } from '@/components/ui/Screen';
 import { Typography } from '@/components/ui/Typography';
 import { projects } from '@/data/projects';
+import { getActiveProjectStageId, getCompletedProjectStageIds } from '@/features/progress/projectProgress';
 import { useProgressStore } from '@/stores/progressStore';
 import {
   border,
@@ -20,7 +21,7 @@ import {
   sizing,
   spacing,
 } from '@/theme/tokens';
-import type { Project, ProjectProgress, ProjectStatus, ProjectType } from '@/types';
+import type { Project, ProjectStatus, ProjectType } from '@/types';
 
 type ProjectFilter = 'all' | 'in-progress' | 'completed';
 
@@ -42,19 +43,11 @@ const typeLabels: Record<ProjectType, string> = {
   dashboard: 'Yönetim paneli',
 };
 
-function getCompletedStageIds(project: Project, progress?: ProjectProgress) {
-  if (progress) return progress.completedStageIds;
-
-  return project.stages
-    .filter((stage) => stage.status === 'completed')
-    .map((stage) => stage.id);
-}
-
-function getProgressValue(project: Project, progress?: ProjectProgress) {
+function getProgressValue(project: Project) {
   if (project.stages.length === 0) return 0;
 
   return Math.round(
-    (getCompletedStageIds(project, progress).length / project.stages.length) * 100,
+    (getCompletedProjectStageIds(project).length / project.stages.length) * 100,
   );
 }
 
@@ -160,15 +153,14 @@ function ProjectCover({ project }: { project: Project }) {
   );
 }
 
-function ProjectCard({ project, progress, width }: {
+function ProjectCard({ project, width }: {
   project: Project;
-  progress?: ProjectProgress;
   width: number;
 }) {
   const [focused, setFocused] = useState(false);
   const status = statusDetails[project.status];
-  const progressValue = getProgressValue(project, progress);
-  const activeStageId = progress?.activeStageId ?? project.currentStageId;
+  const progressValue = getProgressValue(project);
+  const activeStageId = getActiveProjectStageId(project);
   const activeStage = project.stages.find((stage) => stage.id === activeStageId);
   const href = `/projects/${project.id}` as Href;
   const actionLabel = getActionLabel(project.status);
@@ -303,7 +295,6 @@ export function ProjectsScreen() {
           {visibleProjects.map((project) => (
             <ProjectCard
               key={project.id}
-              progress={storedProgress.find((item) => item.projectId === project.id)}
               project={project}
               width={cardWidth}
             />

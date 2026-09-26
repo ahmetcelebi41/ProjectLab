@@ -10,6 +10,7 @@ import { Screen } from '@/components/ui/Screen';
 import { Typography } from '@/components/ui/Typography';
 import { achievements, lessons, projects, quizzes } from '@/data';
 import { getLevelProgress, XP_PER_LEVEL } from '@/features/progress/level';
+import { getCompletedProjectStageIds } from '@/features/progress/projectProgress';
 import { useProgressStore } from '@/stores/progressStore';
 import {
   border,
@@ -40,11 +41,8 @@ function getPercentage(completed: number, total: number) {
   return total > 0 ? Math.round((completed / total) * 100) : 0;
 }
 
-function getCompletedStageCount(project: Project, progress?: ProjectProgress) {
-  const validStageIds = new Set(project.stages.map((stage) => stage.id));
-  return new Set(
-    (progress?.completedStageIds ?? []).filter((stageId) => validStageIds.has(stageId)),
-  ).size;
+function getCompletedStageCount(project: Project) {
+  return getCompletedProjectStageIds(project).length;
 }
 
 function SectionHeading({ description, title }: { description: string; title: string }) {
@@ -195,7 +193,7 @@ function ProjectProgressCard({ progress, project, width }: {
   project: Project;
   width: number;
 }) {
-  const completedStageCount = getCompletedStageCount(project, progress);
+  const completedStageCount = getCompletedStageCount(project);
   const percentage = getPercentage(completedStageCount, project.stages.length);
 
   return (
@@ -319,10 +317,9 @@ export function ProfileScreen() {
     lessonProgress.filter((item) => item.completedAt).map((item) => item.lessonId),
   );
   const completedQuizCount = quizProgress.filter((item) => item.completedAt).length;
-  const completedProjectCount = projects.filter((project) => {
-    const progress = projectProgress.find((item) => item.projectId === project.id);
-    return getCompletedStageCount(project, progress) === project.stages.length;
-  }).length;
+  const completedProjectCount = projects.filter(
+    (project) => getCompletedStageCount(project) === project.stages.length,
+  ).length;
   const earnedIds = new Set<string>(earnedAchievementIds);
   const metrics: readonly Metric[] = [
     { label: 'Toplam proje', value: String(projects.length) },

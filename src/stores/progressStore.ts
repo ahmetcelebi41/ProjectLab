@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware';
 
 import { achievements, lessonsById, quizzes, quizzesById } from '@/data';
 import { evaluateAchievements } from '@/features/achievements/evaluateAchievements';
+import { getQuizAwardXp } from '@/features/progress/rewards';
 import {
   migrateProgressState,
   PROGRESS_STORAGE_KEY,
@@ -105,6 +106,9 @@ export const useProgressStore = create<ProgressStore>()(
           set((state) => {
             const current = state.quizzes.find((item) => item.quizId === result.quizId);
             const isFirstCompletion = !current?.completedAt && Boolean(result.completedAt);
+            const quiz = quizzesById[result.quizId];
+            const awardedXp = current?.awardedXp
+              ?? (isFirstCompletion ? getQuizAwardXp(quiz, result.bestCorrectAnswerCount) : undefined);
             const next: QuizProgress = {
               ...result,
               answers: [
@@ -116,12 +120,13 @@ export const useProgressStore = create<ProgressStore>()(
                 current?.bestCorrectAnswerCount ?? 0,
                 result.bestCorrectAnswerCount,
               ),
+              awardedXp,
               completedAt: current?.completedAt ?? result.completedAt,
             };
 
             return {
               totalXp: isFirstCompletion
-                ? state.totalXp + quizzesById[result.quizId].completionXp
+                ? state.totalXp + (awardedXp ?? quiz.completionXp)
                 : state.totalXp,
               quizzes: replaceById(
                 state.quizzes,
@@ -140,9 +145,6 @@ export const useProgressStore = create<ProgressStore>()(
               ...current,
               ...update,
               projectId,
-              completedStageIds: update.completedStageIds
-                ? [...new Set(update.completedStageIds)]
-                : (current?.completedStageIds ?? []),
             };
 
             return {

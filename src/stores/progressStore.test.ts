@@ -1,4 +1,6 @@
-import { lessonsById, quizzesById } from '@/data';
+import { lessonsById, projectsById, quizzesById } from '@/data';
+import { getCompletedProjectStageIds } from '@/features/progress/projectProgress';
+import { getQuizAwardXp } from '@/features/progress/rewards';
 import type { QuizProgress } from '@/types';
 
 import { useProgressStore } from './progressStore';
@@ -44,8 +46,36 @@ describe('progressStore', () => {
     store.saveQuizResult(quizResult(1));
 
     const state = useProgressStore.getState();
-    expect(state.totalXp).toBe(quiz.completionXp);
+    expect(state.totalXp).toBe(getQuizAwardXp(quiz, 3));
     expect(state.quizzes[0].bestCorrectAnswerCount).toBe(3);
+    expect(state.quizzes[0].awardedXp).toBe(getQuizAwardXp(quiz, 3));
+  });
+
+  it('daha yüksek quiz retry skorunda ek XP üretmez', () => {
+    const store = useProgressStore.getState();
+
+    store.saveQuizResult(quizResult(1));
+    const firstCompletionXp = useProgressStore.getState().totalXp;
+    store.saveQuizResult(quizResult(3));
+
+    const state = useProgressStore.getState();
+    expect(firstCompletionXp).toBe(quiz.completionXp);
+    expect(state.totalXp).toBe(firstCompletionXp);
+    expect(state.quizzes[0].bestCorrectAnswerCount).toBe(3);
+    expect(state.quizzes[0].awardedXp).toBe(quiz.completionXp);
+  });
+
+  it('proje ziyareti yalnız lastVisitedAt metadata alanını kaydeder', () => {
+    const journeyBeforeVisit = getCompletedProjectStageIds(projectsById.nova);
+    useProgressStore.getState().updateProjectProgress('nova', {
+      lastVisitedAt: completedAt,
+    });
+
+    expect(useProgressStore.getState().projects).toEqual([{
+      projectId: 'nova',
+      lastVisitedAt: completedAt,
+    }]);
+    expect(getCompletedProjectStageIds(projectsById.nova)).toEqual(journeyBeforeVisit);
   });
 
   it('duplicate achievement olusturmaz', () => {
