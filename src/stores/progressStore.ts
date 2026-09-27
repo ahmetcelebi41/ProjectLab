@@ -15,11 +15,12 @@ import type {
   AchievementId,
   LessonId,
   LessonProgress,
-  Progress,
   ProjectId,
   ProjectProgress,
   QuizProgress,
+  UserProgress,
 } from '@/types';
+import { PROGRESS_SCHEMA_VERSION } from '@/types';
 
 type LessonProgressUpdate = Readonly<Partial<Omit<LessonProgress, 'lessonId'>>>;
 type ProjectProgressUpdate = Readonly<Partial<Omit<ProjectProgress, 'projectId'>>>;
@@ -35,16 +36,19 @@ type ProgressActions = {
   setHasHydrated: (hasHydrated: boolean) => void;
 };
 
-export type ProgressStore = Progress &
+export type ProgressStore = UserProgress &
   ProgressActions & {
     hasHydrated: boolean;
   };
 
-const initialProgress: Progress = {
+const initialProgress: UserProgress = {
+  schemaVersion: PROGRESS_SCHEMA_VERSION,
   totalXp: 0,
   projects: [],
   lessons: [],
   quizzes: [],
+  quizHistory: [],
+  lastActivity: null,
   earnedAchievementIds: [],
 };
 
@@ -186,10 +190,13 @@ export const useProgressStore = create<ProgressStore>()(
       storage: progressStorage,
       migrate: migrateProgressState,
       partialize: (state): PersistedProgressState => ({
+        schemaVersion: state.schemaVersion,
         totalXp: state.totalXp,
         projects: state.projects,
         lessons: state.lessons,
         quizzes: state.quizzes,
+        quizHistory: state.quizHistory,
+        lastActivity: state.lastActivity,
         earnedAchievementIds: state.earnedAchievementIds,
       }),
       onRehydrateStorage: () => (state) => {

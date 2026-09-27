@@ -1,7 +1,7 @@
 import { lessonsById, projectsById, quizzesById } from '@/data';
 import { getCompletedProjectStageIds } from '@/features/progress/projectProgress';
 import { getQuizAwardXp } from '@/features/progress/rewards';
-import type { QuizProgress } from '@/types';
+import { PROGRESS_SCHEMA_VERSION, type QuizProgress } from '@/types';
 
 import { useProgressStore } from './progressStore';
 
@@ -21,12 +21,60 @@ function quizResult(bestCorrectAnswerCount: number): QuizProgress {
 describe('progressStore', () => {
   beforeEach(() => {
     useProgressStore.setState({
+      schemaVersion: PROGRESS_SCHEMA_VERSION,
       totalXp: 0,
       projects: [],
       lessons: [],
       quizzes: [],
+      quizHistory: [],
+      lastActivity: null,
       earnedAchievementIds: [],
       hasHydrated: false,
+    });
+  });
+
+  it('V1.1 schema ve guvenli progress varsayilanlarini saglar', () => {
+    useProgressStore.setState({
+      quizHistory: [{
+        quizId: quiz.id,
+        completedAt,
+        correctAnswerCount: 2,
+        questionCount: 3,
+        wrongQuestionIds: ['question-3'],
+      }],
+      lastActivity: { type: 'quiz', quizId: quiz.id, occurredAt: completedAt },
+    });
+
+    useProgressStore.getState().resetProgress();
+
+    const state = useProgressStore.getState();
+    expect(state.schemaVersion).toBe(2);
+    expect(state.lessons).toEqual([]);
+    expect(state.quizHistory).toEqual([]);
+    expect(state.lastActivity).toBeNull();
+  });
+
+  it('V1.1 alanlarini persisted state kapsaminda tutar', () => {
+    const quizHistory = [{
+      quizId: quiz.id,
+      completedAt,
+      correctAnswerCount: 2,
+      questionCount: 3,
+      wrongQuestionIds: ['question-3'],
+    }] as const;
+    const lastActivity = { type: 'quiz', quizId: quiz.id, occurredAt: completedAt } as const;
+    useProgressStore.setState({ quizHistory, lastActivity });
+
+    const partialize = useProgressStore.persist.getOptions().partialize;
+    expect(partialize).toBeDefined();
+    if (!partialize) throw new Error('Progress partialize tanimli olmali');
+
+    const persisted = partialize(useProgressStore.getState());
+    expect(persisted).toMatchObject({
+      schemaVersion: 2,
+      lessons: [],
+      quizHistory,
+      lastActivity,
     });
   });
 

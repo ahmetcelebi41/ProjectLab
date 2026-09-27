@@ -8,12 +8,17 @@ export type {
 } from './lesson';
 export type {
   ContentProgressStatus,
+  LastActivity,
   LessonProgress,
   Progress,
+  ProgressSchemaVersion,
   ProjectProgress,
   QuizAnswer,
+  QuizAttempt,
   QuizProgress,
+  UserProgress,
 } from './progress';
+export { PROGRESS_SCHEMA_VERSION } from './progress';
 export type {
   Project,
   ProjectId,

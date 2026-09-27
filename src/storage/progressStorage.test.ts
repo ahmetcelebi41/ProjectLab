@@ -1,19 +1,29 @@
 import { quizzesById } from '@/data/quizzes';
-import type { PersistedProgressState } from './progressStorage';
+import { PROGRESS_SCHEMA_VERSION } from '@/types';
 
-import { migrateProgressState } from './progressStorage';
+import {
+  migrateProgressState,
+  PROGRESS_STORAGE_KEY,
+  PROGRESS_STORAGE_VERSION,
+} from './progressStorage';
 
 describe('progress storage migration', () => {
+  it('V1.1 veri schema surumunu storage anahtarindan ayri olarak tanimlar', () => {
+    expect(PROGRESS_SCHEMA_VERSION).toBe(2);
+    expect(PROGRESS_STORAGE_KEY).toBe('@projectlab/progress');
+    expect(PROGRESS_STORAGE_VERSION).toBe(2);
+  });
+
   it('v1 tamamlanmış quizde totalXp değerini ve yalnız kullanıcı metadata alanlarını korur', () => {
     const quiz = quizzesById['design-tokens-quiz'];
-    const state: PersistedProgressState = {
+    const state = {
       totalXp: 137,
       projects: [{
         projectId: 'nova',
         lastVisitedAt: '2026-09-26T00:00:00.000Z',
         completedStageIds: ['development'],
         activeStageId: 'release',
-      } as PersistedProgressState['projects'][number]],
+      }],
       lessons: [],
       quizzes: [{
         quizId: quiz.id,
