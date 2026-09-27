@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware';
 
 import { achievements, lessonsById, quizzes, quizzesById } from '@/data';
 import { evaluateAchievements } from '@/features/achievements/evaluateAchievements';
+import { isLessonCompleted } from '@/features/progress/lessonProgress';
 import { getQuizAwardXp } from '@/features/progress/rewards';
 import {
   migrateProgressState,
@@ -13,21 +14,27 @@ import {
 } from '@/storage/progressStorage';
 import type {
   AchievementId,
+  LastActivity,
   LessonId,
   LessonProgress,
   ProjectId,
   ProjectProgress,
   QuizProgress,
+  QuizId,
   UserProgress,
 } from '@/types';
 import { PROGRESS_SCHEMA_VERSION } from '@/types';
 
 type LessonProgressUpdate = Readonly<Partial<Omit<LessonProgress, 'lessonId'>>>;
 type ProjectProgressUpdate = Readonly<Partial<Omit<ProjectProgress, 'projectId'>>>;
+type LastActivityTarget =
+  | Readonly<{ type: 'lesson'; lessonId: LessonId }>
+  | Readonly<{ type: 'quiz'; quizId: QuizId }>;
 
 type ProgressActions = {
   updateLessonProgress: (lessonId: LessonId, update: LessonProgressUpdate) => void;
   completeLesson: (lessonId: LessonId, completedAt?: string) => void;
+  setLastActivity: (activity: LastActivityTarget, updatedAt?: string) => void;
   saveQuizResult: (result: QuizProgress) => void;
   updateProjectProgress: (projectId: ProjectId, update: ProjectProgressUpdate) => void;
   setTotalXp: (totalXp: number) => void;
@@ -64,6 +71,12 @@ function replaceById<T>(
   return items.map((item, itemIndex) => (itemIndex === index ? nextItem : item));
 }
 
+function getActivityTargetKey(activity: LastActivity | LastActivityTarget): string {
+  return activity.type === 'lesson'
+    ? `${activity.type}:${activity.lessonId}`
+    : `${activity.type}:${activity.quizId}`;
+}
+
 export const useProgressStore = create<ProgressStore>()(
   persist(
     (set, get) => {
@@ -92,10 +105,10 @@ export const useProgressStore = create<ProgressStore>()(
         },
 
         completeLesson: (lessonId, completedAt = new Date().toISOString()) => {
+          if (isLessonCompleted(get().lessons, lessonId)) return;
+
           set((state) => {
             const current = state.lessons.find((item) => item.lessonId === lessonId);
-            if (current?.completedAt) return state;
-
             const next: LessonProgress = { ...current, lessonId, completedAt };
 
             return {
@@ -104,6 +117,18 @@ export const useProgressStore = create<ProgressStore>()(
             };
           });
           evaluateCurrentAchievements();
+        },
+
+        setLastActivity: (activity, updatedAt = new Date().toISOString()) => {
+          const current = get().lastActivity;
+          if (
+            current?.occurredAt === updatedAt
+            && getActivityTargetKey(current) === getActivityTargetKey(activity)
+          ) {
+            return;
+          }
+
+          set({ lastActivity: { ...activity, occurredAt: updatedAt } });
         },
 
         saveQuizResult: (result) => {

@@ -82,9 +82,75 @@ describe('progressStore', () => {
     const store = useProgressStore.getState();
 
     store.completeLesson('design-tokens', completedAt);
+    const stateAfterFirstCompletion = useProgressStore.getState();
     store.completeLesson('design-tokens', '2026-09-27T00:00:00.000Z');
 
-    expect(useProgressStore.getState().totalXp).toBe(lessonsById['design-tokens'].completionXp);
+    const state = useProgressStore.getState();
+    expect(state).toBe(stateAfterFirstCompletion);
+    expect(state.totalXp).toBe(lessonsById['design-tokens'].completionXp);
+    expect(state.lessons).toEqual([{ lessonId: 'design-tokens', completedAt }]);
+  });
+
+  it('mevcut progress verisini ilk ders tamamlamasinda korur', () => {
+    const existingLesson = {
+      lessonId: 'api-contracts',
+      lastBlockId: 'request-shape',
+      completedAt: '2026-09-25T00:00:00.000Z',
+    } as const;
+    const existingProject = { projectId: 'nova', lastVisitedAt: completedAt } as const;
+    useProgressStore.setState({
+      totalXp: 25,
+      lessons: [existingLesson],
+      projects: [existingProject],
+      earnedAchievementIds: ['first-project'],
+    });
+
+    useProgressStore.getState().completeLesson('design-tokens', completedAt);
+
+    const state = useProgressStore.getState();
+    expect(state.totalXp).toBe(25 + lessonsById['design-tokens'].completionXp);
+    expect(state.lessons).toEqual([
+      existingLesson,
+      { lessonId: 'design-tokens', completedAt },
+    ]);
+    expect(state.projects).toEqual([existingProject]);
+    expect(state.earnedAchievementIds).toEqual(['first-project']);
+  });
+
+  it('son aktiviteyi mevcut activity semasiyla set eder ve gunceller', () => {
+    const store = useProgressStore.getState();
+    store.setLastActivity({ type: 'lesson', lessonId: 'design-tokens' }, completedAt);
+
+    expect(useProgressStore.getState().lastActivity).toEqual({
+      type: 'lesson',
+      lessonId: 'design-tokens',
+      occurredAt: completedAt,
+    });
+
+    const updatedAt = '2026-09-27T12:00:00.000Z';
+    useProgressStore.getState().setLastActivity(
+      { type: 'quiz', quizId: 'design-tokens-quiz' },
+      updatedAt,
+    );
+
+    expect(useProgressStore.getState().lastActivity).toEqual({
+      type: 'quiz',
+      quizId: 'design-tokens-quiz',
+      occurredAt: updatedAt,
+    });
+  });
+
+  it('ayni son aktivite icin gereksiz state uretmez', () => {
+    const store = useProgressStore.getState();
+    store.setLastActivity({ type: 'lesson', lessonId: 'design-tokens' }, completedAt);
+    const activity = useProgressStore.getState().lastActivity;
+
+    useProgressStore.getState().setLastActivity(
+      { type: 'lesson', lessonId: 'design-tokens' },
+      completedAt,
+    );
+
+    expect(useProgressStore.getState().lastActivity).toBe(activity);
   });
 
   it('quiz XP sini yalniz ilk tamamlamada ekler ve en yuksek skoru korur', () => {
