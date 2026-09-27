@@ -34,8 +34,11 @@ export type QuizProgress = Readonly<{
   completedAt?: string;
 }>;
 
+export type QuizAttemptType = 'full' | 'retry';
+
 export type QuizAttempt = Readonly<{
   quizId: QuizId;
+  attemptType?: QuizAttemptType;
   completedAt: string;
   correctAnswerCount: number;
   questionCount: number;

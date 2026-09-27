@@ -181,6 +181,13 @@ describe('progress storage migration', () => {
         correctAnswerCount: 2,
         questionCount: 3,
         wrongQuestionIds: ['question-3'],
+      }, {
+        quizId: 'design-tokens-quiz',
+        attemptType: 'retry',
+        completedAt: '2026-09-27T11:00:00.000Z',
+        correctAnswerCount: 1,
+        questionCount: 2,
+        wrongQuestionIds: ['question-3'],
       }],
       lastActivity: {
         type: 'quiz',

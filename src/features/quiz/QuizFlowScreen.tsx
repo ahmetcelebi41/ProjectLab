@@ -11,13 +11,15 @@ import { Screen } from '@/components/ui/Screen';
 import { Typography } from '@/components/ui/Typography';
 import { useProgressStore } from '@/stores/progressStore';
 import { border, colors, layout, radius, sizing, spacing } from '@/theme/tokens';
-import type { Quiz, QuizAnswer, QuizQuestion } from '@/types';
+import type { QuizAnswer, QuizQuestion } from '@/types';
 
-import { countCorrectAnswers, getValidQuizAnswers, resolveQuiz } from './quizUtils';
+import { createQuizAttempt, getQuizRetryQuestions } from './quizAttempts';
+import { getValidQuizAnswers, resolveQuiz } from './quizUtils';
 
 type Props = {
   lessonId?: string;
   quizId?: string;
+  retryAttemptAt?: string;
 };
 
 type AnswerMap = Record<string, string>;
@@ -68,6 +70,27 @@ function QuizNotFound({ lessonId }: Pick<Props, 'lessonId'>) {
           ) : null}
           <Button onPress={() => router.replace('/learn')} size="large">Öğren’e Dön</Button>
         </View>
+      </Card>
+    </Screen>
+  );
+}
+
+function RetryUnavailable({ lessonId, quizId }: Props) {
+  const resultPath = lessonId && quizId
+    ? `/learn/${lessonId}/quiz/${quizId}/result` as Href
+    : '/learn' as Href;
+
+  return (
+    <Screen contentContainerStyle={styles.centeredState} edges={['top', 'bottom']}>
+      <Card accessibilityLiveRegion="polite" style={styles.stateCard}>
+        <Badge variant="warning">Tekrar oturumu hazır değil</Badge>
+        <View style={styles.copy}>
+          <Typography accessibilityRole="header" variant="h2">Yanlış sorular bulunamadı</Typography>
+          <Typography color="textSecondary" style={styles.bodyLine}>
+            Seçilen denemede tekrar çözülebilecek geçerli bir yanlış soru yok.
+          </Typography>
+        </View>
+        <Button onPress={() => router.replace(resultPath)} size="large">Sonuca Dön</Button>
       </Card>
     </Screen>
   );
@@ -141,24 +164,30 @@ function QuestionFeedback({ question, selectedOptionId }: {
       <Typography accessibilityRole="header" variant="h4">
         {isCorrect ? 'Cevabın doğru.' : 'Doğru cevap yukarıda gösterildi.'}
       </Typography>
-      <Typography color="textSecondary" style={styles.bodyLine}>{question.explanation}</Typography>
+      {question.explanation ? (
+        <Typography color="textSecondary" style={styles.bodyLine}>{question.explanation}</Typography>
+      ) : null}
     </Card>
   );
 }
 
-function answersFromMap(quiz: Quiz, answerMap: AnswerMap): QuizAnswer[] {
-  return quiz.questions.flatMap((question) => {
+function answersFromMap(
+  questions: readonly QuizQuestion[],
+  answerMap: AnswerMap,
+): QuizAnswer[] {
+  return questions.flatMap((question) => {
     const selectedOptionId = answerMap[question.id];
     return selectedOptionId ? [{ questionId: question.id, selectedOptionId }] : [];
   });
 }
 
-export function QuizFlowScreen({ lessonId, quizId }: Props) {
+export function QuizFlowScreen({ lessonId, quizId, retryAttemptAt }: Props) {
   const quiz = resolveQuiz(lessonId, quizId);
   const hasHydrated = useProgressStore((state) => state.hasHydrated);
   const savedProgress = useProgressStore((state) =>
     quiz ? state.quizzes.find((item) => item.quizId === quiz.id) : undefined,
   );
+  const quizHistory = useProgressStore((state) => state.quizHistory);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<AnswerMap>({});
   const [checkedQuestions, setCheckedQuestions] = useState<CheckedMap>({});
@@ -173,13 +202,34 @@ export function QuizFlowScreen({ lessonId, quizId }: Props) {
     setCurrentQuestionIndex(0);
     setAnswers({});
     setCheckedQuestions({});
-  }, [lessonId, quizId]);
+  }, [lessonId, quizId, retryAttemptAt]);
+
+  const retryAttempt = useMemo(
+    () => retryAttemptAt && quiz
+      ? quizHistory.find((attempt) => (
+        attempt.quizId === quiz.id && attempt.completedAt === retryAttemptAt
+      )) ?? (
+        savedProgress?.completedAt === retryAttemptAt
+          ? createQuizAttempt(quiz, savedProgress.answers, savedProgress.completedAt)
+          : undefined
+      )
+      : undefined,
+    [quiz, quizHistory, retryAttemptAt, savedProgress],
+  );
+  const sessionQuestions = useMemo(
+    () => quiz
+      ? retryAttemptAt
+        ? getQuizRetryQuestions(quiz, retryAttempt)
+        : quiz.questions
+      : [],
+    [quiz, retryAttempt, retryAttemptAt],
+  );
 
   useEffect(() => {
     if (!hasHydrated || !quiz || initialized.current) return;
     initialized.current = true;
 
-    if (!savedProgress?.completedAt) {
+    if (!retryAttemptAt && !savedProgress?.completedAt) {
       const validSavedAnswers = getValidQuizAnswers(quiz, savedProgress?.answers ?? []);
       const resumedAnswers = Object.fromEntries(
         validSavedAnswers.map((answer) => [answer.questionId, answer.selectedOptionId]),
@@ -187,7 +237,7 @@ export function QuizFlowScreen({ lessonId, quizId }: Props) {
       const resumedChecked = Object.fromEntries(
         validSavedAnswers.map((answer) => [answer.questionId, true]),
       );
-      const lastQuestionIndex = Math.max(0, quiz.questions.length - 1);
+      const lastQuestionIndex = Math.max(0, sessionQuestions.length - 1);
 
       setAnswers(resumedAnswers);
       setCheckedQuestions(resumedChecked);
@@ -195,22 +245,27 @@ export function QuizFlowScreen({ lessonId, quizId }: Props) {
     }
 
     setSessionReady(true);
-  }, [hasHydrated, quiz, savedProgress]);
+  }, [hasHydrated, quiz, retryAttemptAt, savedProgress, sessionQuestions.length]);
 
-  const currentQuestion = quiz?.questions[currentQuestionIndex];
+  const currentQuestion = sessionQuestions[currentQuestionIndex];
   const selectedOptionId = currentQuestion ? answers[currentQuestion.id] : undefined;
   const isChecked = currentQuestion ? Boolean(checkedQuestions[currentQuestion.id]) : false;
-  const progressValue = quiz ? ((currentQuestionIndex + 1) / quiz.questions.length) * 100 : 0;
+  const progressValue = sessionQuestions.length
+    ? ((currentQuestionIndex + 1) / sessionQuestions.length) * 100
+    : 0;
   const selectedAnswers = useMemo(
-    () => (quiz ? answersFromMap(quiz, answers) : []),
-    [answers, quiz],
+    () => answersFromMap(sessionQuestions, answers),
+    [answers, sessionQuestions],
   );
 
   if (!quiz) return <QuizNotFound lessonId={lessonId} />;
+  if (hasHydrated && retryAttemptAt && sessionQuestions.length === 0) {
+    return <RetryUnavailable lessonId={lessonId} quizId={quizId} />;
+  }
   if (!hasHydrated || !sessionReady || !currentQuestion) return <QuizLoading />;
 
   const saveDraft = (nextAnswers: readonly QuizAnswer[], nextIndex: number) => {
-    if (savedProgress?.completedAt) return;
+    if (retryAttemptAt || savedProgress?.completedAt) return;
 
     useProgressStore.getState().saveQuizResult({
       quizId: quiz.id,
@@ -231,26 +286,38 @@ export function QuizFlowScreen({ lessonId, quizId }: Props) {
     if (!isChecked) return;
 
     const nextIndex = currentQuestionIndex + 1;
-    if (nextIndex < quiz.questions.length) {
+    if (nextIndex < sessionQuestions.length) {
       setCurrentQuestionIndex(nextIndex);
       saveDraft(selectedAnswers, nextIndex);
       return;
     }
 
-    if (submitting.current || selectedAnswers.length !== quiz.questions.length) return;
+    if (submitting.current || selectedAnswers.length !== sessionQuestions.length) return;
     submitting.current = true;
 
     const state = useProgressStore.getState();
-    const correctAnswerCount = countCorrectAnswers(quiz, selectedAnswers);
-    const completedAt = new Date().toISOString();
+    const attemptType = retryAttemptAt ? 'retry' : 'full';
+    const lastAttemptAt = state.quizHistory
+      .filter((attempt) => attempt.quizId === quiz.id)
+      .at(-1)?.completedAt;
+    const now = Date.now();
+    const previousTime = lastAttemptAt ? Date.parse(lastAttemptAt) : Number.NaN;
+    const completedAt = new Date(
+      Number.isFinite(previousTime) ? Math.max(now, previousTime + 1) : now,
+    ).toISOString();
+    const attempt = createQuizAttempt(quiz, selectedAnswers, completedAt, attemptType);
+    if (!attempt) {
+      submitting.current = false;
+      return;
+    }
 
     state.saveQuizResult({
       quizId: quiz.id,
       currentQuestionIndex: quiz.questions.length - 1,
       answers: selectedAnswers,
-      bestCorrectAnswerCount: correctAnswerCount,
+      bestCorrectAnswerCount: attempt.correctAnswerCount,
       completedAt,
-    });
+    }, attemptType);
 
     router.replace(`/learn/${quiz.lessonId}/quiz/${quiz.id}/result` as Href);
   };
@@ -261,7 +328,7 @@ export function QuizFlowScreen({ lessonId, quizId }: Props) {
     saveDraft(selectedAnswers, previousIndex);
   };
 
-  const isLastQuestion = currentQuestionIndex === quiz.questions.length - 1;
+  const isLastQuestion = currentQuestionIndex === sessionQuestions.length - 1;
 
   return (
     <Screen
@@ -272,7 +339,9 @@ export function QuizFlowScreen({ lessonId, quizId }: Props) {
       <View style={styles.header}>
         <View style={styles.metaRow}>
           <Badge variant="info">Mini Quiz</Badge>
-          <Typography color="textMuted" variant="caption">{quiz.questions.length} soru · +{quiz.completionXp} XP</Typography>
+          <Typography color="textMuted" variant="caption">
+            {sessionQuestions.length} soru{retryAttemptAt ? ' · Yanlış tekrar' : ''}
+          </Typography>
         </View>
         <View style={styles.copy}>
           <Typography accessibilityRole="header" variant="h1">{quiz.title}</Typography>
@@ -283,10 +352,10 @@ export function QuizFlowScreen({ lessonId, quizId }: Props) {
       <Card style={styles.progressCard}>
         <View style={styles.progressHeader}>
           <Typography variant="h4">Soru {currentQuestionIndex + 1}</Typography>
-          <Typography color="textMuted" variant="caption">{currentQuestionIndex + 1} / {quiz.questions.length}</Typography>
+          <Typography color="textMuted" variant="caption">{currentQuestionIndex + 1} / {sessionQuestions.length}</Typography>
         </View>
         <Progress
-          accessibilityLabel={`${quiz.title} ilerlemesi, ${quiz.questions.length} sorudan ${currentQuestionIndex + 1}`}
+          accessibilityLabel={`${quiz.title} ilerlemesi, ${sessionQuestions.length} sorudan ${currentQuestionIndex + 1}`}
           value={progressValue}
         />
       </Card>

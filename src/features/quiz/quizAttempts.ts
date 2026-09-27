@@ -1,4 +1,11 @@
-import type { Quiz, QuizAnswer, QuizAttempt, QuizId, QuizQuestion } from '@/types';
+import type {
+  Quiz,
+  QuizAnswer,
+  QuizAttempt,
+  QuizAttemptType,
+  QuizId,
+  QuizQuestion,
+} from '@/types';
 
 import { getValidQuizAnswers } from './quizUtils';
 
@@ -12,28 +19,39 @@ export function createQuizAttempt(
   quiz: Quiz,
   answers: readonly QuizAnswer[],
   completedAt: string,
+  attemptType: QuizAttemptType = 'full',
 ): QuizAttempt | undefined {
   if (!completedAt) return undefined;
 
   const validAnswers = getValidQuizAnswers(quiz, answers);
-  if (validAnswers.length !== quiz.questions.length) return undefined;
+  if (
+    validAnswers.length === 0
+    || (attemptType === 'full' && validAnswers.length !== quiz.questions.length)
+  ) return undefined;
 
   const answersByQuestionId = new Map(
     validAnswers.map((answer) => [answer.questionId, answer.selectedOptionId]),
   );
   const wrongQuestionIds = [...new Set(
-    quiz.questions
+    validAnswers
+      .map((answer) => quiz.questions.find((question) => question.id === answer.questionId))
+      .filter((question): question is QuizQuestion => Boolean(question))
       .filter((question) => answersByQuestionId.get(question.id) !== question.correctOptionId)
       .map((question) => question.id),
   )];
 
   return {
     quizId: quiz.id,
+    attemptType,
     completedAt,
-    correctAnswerCount: quiz.questions.length - wrongQuestionIds.length,
-    questionCount: quiz.questions.length,
+    correctAnswerCount: validAnswers.length - wrongQuestionIds.length,
+    questionCount: validAnswers.length,
     wrongQuestionIds,
   };
+}
+
+export function isFullQuizAttempt(attempt: QuizAttempt): boolean {
+  return attempt.attemptType !== 'retry';
 }
 
 export function getQuizAttemptScore(attempt: QuizAttempt): QuizAttemptScore {
@@ -67,7 +85,7 @@ export function getBestQuizAttempt(
   quizId: QuizId,
 ): QuizAttempt | undefined {
   return history.reduce<QuizAttempt | undefined>((best, attempt) => {
-    if (attempt.quizId !== quizId) return best;
+    if (attempt.quizId !== quizId || !isFullQuizAttempt(attempt)) return best;
     if (!best || getQuizAttemptScore(attempt).score > getQuizAttemptScore(best).score) {
       return attempt;
     }
@@ -75,11 +93,22 @@ export function getBestQuizAttempt(
   }, undefined);
 }
 
+export function getLastFullQuizAttempt(
+  history: readonly QuizAttempt[],
+  quizId: QuizId,
+): QuizAttempt | undefined {
+  for (let index = history.length - 1; index >= 0; index -= 1) {
+    const attempt = history[index];
+    if (attempt.quizId === quizId && isFullQuizAttempt(attempt)) return attempt;
+  }
+  return undefined;
+}
+
 export function getLastQuizScore(
   history: readonly QuizAttempt[],
   quizId: QuizId,
 ): QuizAttemptScore | undefined {
-  const attempt = getLastQuizAttempt(history, quizId);
+  const attempt = getLastFullQuizAttempt(history, quizId);
   return attempt ? getQuizAttemptScore(attempt) : undefined;
 }
 
@@ -106,6 +135,7 @@ export function isSameQuizCompletionEvent(
   right: QuizAttempt,
 ): boolean {
   return left.quizId === right.quizId
+    && (left.attemptType ?? 'full') === (right.attemptType ?? 'full')
     && left.completedAt === right.completedAt
     && left.correctAnswerCount === right.correctAnswerCount
     && left.questionCount === right.questionCount

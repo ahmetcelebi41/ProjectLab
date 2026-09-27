@@ -106,6 +106,9 @@ function isQuizProgress(value: unknown): value is QuizProgress {
 function isQuizAttempt(value: unknown): value is QuizAttempt {
   return isRecord(value)
     && isQuizId(value.quizId)
+    && (value.attemptType === undefined
+      || value.attemptType === 'full'
+      || value.attemptType === 'retry')
     && typeof value.completedAt === 'string'
     && isNonNegativeInteger(value.correctAnswerCount)
     && isNonNegativeInteger(value.questionCount)

@@ -24,6 +24,7 @@ import type {
   ProjectId,
   ProjectProgress,
   QuizProgress,
+  QuizAttemptType,
   QuizId,
   UserProgress,
 } from '@/types';
@@ -39,7 +40,7 @@ type ProgressActions = {
   updateLessonProgress: (lessonId: LessonId, update: LessonProgressUpdate) => void;
   completeLesson: (lessonId: LessonId, completedAt?: string) => void;
   setLastActivity: (activity: LastActivityTarget, updatedAt?: string) => void;
-  saveQuizResult: (result: QuizProgress) => void;
+  saveQuizResult: (result: QuizProgress, attemptType?: QuizAttemptType) => void;
   updateProjectProgress: (projectId: ProjectId, update: ProjectProgressUpdate) => void;
   setTotalXp: (totalXp: number) => void;
   unlockAchievement: (achievementId: AchievementId) => void;
@@ -135,14 +136,16 @@ export const useProgressStore = create<ProgressStore>()(
           set({ lastActivity: { ...activity, occurredAt: updatedAt } });
         },
 
-        saveQuizResult: (result) => {
+        saveQuizResult: (result, attemptType = 'full') => {
           set((state) => {
             const current = state.quizzes.find((item) => item.quizId === result.quizId);
             const quiz = quizzesById[result.quizId];
             const attempt = result.completedAt
-              ? createQuizAttempt(quiz, result.answers, result.completedAt)
+              ? createQuizAttempt(quiz, result.answers, result.completedAt, attemptType)
               : undefined;
-            const isFirstCompletion = !current?.completedAt && attempt !== undefined;
+            const isFirstCompletion = attemptType === 'full'
+              && !current?.completedAt
+              && attempt !== undefined;
             const correctAnswerCount = attempt?.correctAnswerCount
               ?? result.bestCorrectAnswerCount;
             const awardedXp = current?.awardedXp
@@ -156,7 +159,9 @@ export const useProgressStore = create<ProgressStore>()(
               ],
               bestCorrectAnswerCount: Math.max(
                 current?.bestCorrectAnswerCount ?? 0,
-                correctAnswerCount,
+                attemptType === 'full'
+                  ? correctAnswerCount
+                  : current?.bestCorrectAnswerCount ?? 0,
               ),
               awardedXp,
               completedAt: current?.completedAt ?? attempt?.completedAt,

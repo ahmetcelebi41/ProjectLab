@@ -197,6 +197,33 @@ describe('progressStore', () => {
     expect(state.quizzes[0].awardedXp).toBe(quiz.completionXp);
   });
 
+  it('yanlış soru retry attemptini historyye ekler ama full best ve XP değerini değiştirmez', () => {
+    const store = useProgressStore.getState();
+    store.saveQuizResult(quizResult(1));
+    const firstCompletionXp = useProgressStore.getState().totalXp;
+
+    const retryCompletedAt = '2026-09-27T12:00:00.000Z';
+    store.saveQuizResult({
+      quizId: quiz.id,
+      currentQuestionIndex: 1,
+      answers: answersFor(quiz, 2).slice(0, 2),
+      bestCorrectAnswerCount: 2,
+      completedAt: retryCompletedAt,
+    }, 'retry');
+
+    const state = useProgressStore.getState();
+    expect(state.totalXp).toBe(firstCompletionXp);
+    expect(state.quizzes[0].bestCorrectAnswerCount).toBe(1);
+    expect(state.quizHistory).toHaveLength(2);
+    expect(state.quizHistory[1]).toMatchObject({
+      attemptType: 'retry',
+      completedAt: retryCompletedAt,
+      correctAnswerCount: 2,
+      questionCount: 2,
+      wrongQuestionIds: [],
+    });
+  });
+
   it('gecerli quiz completionlarini sirali history olarak saklar ve event duplicate etmez', () => {
     const firstAttempt = quizResult(1);
     const secondCompletedAt = '2026-09-27T00:00:00.000Z';
@@ -212,6 +239,7 @@ describe('progressStore', () => {
     expect(useProgressStore.getState().quizHistory).toEqual([
       {
         quizId: quiz.id,
+        attemptType: 'full',
         completedAt,
         correctAnswerCount: 1,
         questionCount: quiz.questions.length,
@@ -219,6 +247,7 @@ describe('progressStore', () => {
       },
       {
         quizId: quiz.id,
+        attemptType: 'full',
         completedAt: secondCompletedAt,
         correctAnswerCount: 2,
         questionCount: quiz.questions.length,

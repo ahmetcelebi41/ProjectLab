@@ -15,6 +15,7 @@ export type {
   ProjectProgress,
   QuizAnswer,
   QuizAttempt,
+  QuizAttemptType,
   QuizProgress,
   UserProgress,
 } from './progress';

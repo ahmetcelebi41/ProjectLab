@@ -40,6 +40,7 @@ describe('quiz attempt services', () => {
 
     expect(attempt).toEqual({
       quizId: designTokensQuiz.id,
+      attemptType: 'full',
       completedAt: firstCompletedAt,
       correctAnswerCount: 1,
       questionCount: 3,
@@ -114,6 +115,44 @@ describe('quiz attempt services', () => {
     const second = attemptFor(2, secondCompletedAt);
 
     expect(getBestQuizAttempt([first, second], designTokensQuiz.id)).toBe(first);
+  });
+
+  it('excludes remediation retries from full quiz last and best scores', () => {
+    const fullForty: QuizAttempt = {
+      quizId: designTokensQuiz.id,
+      completedAt: firstCompletedAt,
+      correctAnswerCount: 2,
+      questionCount: 5,
+      wrongQuestionIds: ['full-wrong-1', 'full-wrong-2', 'full-wrong-3'],
+    };
+    const retrySixty: QuizAttempt = {
+      quizId: designTokensQuiz.id,
+      attemptType: 'retry',
+      completedAt: secondCompletedAt,
+      correctAnswerCount: 3,
+      questionCount: 5,
+      wrongQuestionIds: ['retry-wrong-1', 'retry-wrong-2'],
+    };
+    const fullEighty: QuizAttempt = {
+      quizId: designTokensQuiz.id,
+      attemptType: 'full',
+      completedAt: '2026-09-27T12:00:00.000Z',
+      correctAnswerCount: 4,
+      questionCount: 5,
+      wrongQuestionIds: ['full-wrong-1'],
+    };
+
+    expect(getQuizAttemptScore(retrySixty).score).toBe(60);
+    expect(getLastQuizScore([fullForty, retrySixty], designTokensQuiz.id)?.score).toBe(40);
+    expect(getBestQuizScore([fullForty, retrySixty], designTokensQuiz.id)?.score).toBe(40);
+    expect(getLastQuizScore(
+      [fullForty, retrySixty, fullEighty],
+      designTokensQuiz.id,
+    )?.score).toBe(80);
+    expect(getBestQuizScore(
+      [fullForty, retrySixty, fullEighty],
+      designTokensQuiz.id,
+    )?.score).toBe(80);
   });
 
   it('builds retry questions only from a selected attempt and ignores unknown ids', () => {

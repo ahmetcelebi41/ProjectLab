@@ -8,11 +8,18 @@ import { Card } from '@/components/ui/Card';
 import { Progress } from '@/components/ui/Progress';
 import { Screen } from '@/components/ui/Screen';
 import { Typography } from '@/components/ui/Typography';
-import { getQuizAwardXp } from '@/features/progress/rewards';
 import { useProgressStore } from '@/stores/progressStore';
 import { colors, layout, radius, spacing } from '@/theme/tokens';
 
-import { getQuizScore, getValidQuizAnswers, resolveQuiz } from './quizUtils';
+import {
+  createQuizAttempt,
+  getBestQuizScore,
+  getLastQuizAttempt,
+  getLastQuizScore,
+  getQuizAttemptScore,
+  getQuizRetryQuestions,
+} from './quizAttempts';
+import { resolveQuiz } from './quizUtils';
 
 type Props = {
   lessonId?: string;
@@ -71,26 +78,35 @@ export function QuizResultScreen({ lessonId, quizId }: Props) {
   const savedProgress = useProgressStore((state) =>
     quiz ? state.quizzes.find((item) => item.quizId === quiz.id) : undefined,
   );
+  const quizHistory = useProgressStore((state) => state.quizHistory);
 
   if (!quiz) return <ResultState lessonId={lessonId} missingQuiz />;
   if (!hasHydrated) return <LoadingResult />;
-  const validAnswers = getValidQuizAnswers(quiz, savedProgress?.answers ?? []);
-  if (!savedProgress?.completedAt || validAnswers.length !== quiz.questions.length) {
+  const fallbackAttempt = savedProgress?.completedAt
+    ? createQuizAttempt(quiz, savedProgress.answers, savedProgress.completedAt)
+    : undefined;
+  const attemptHistory = quizHistory.some((attempt) => attempt.quizId === quiz.id)
+    ? quizHistory
+    : fallbackAttempt
+      ? [fallbackAttempt]
+      : [];
+  const lastAttempt = getLastQuizAttempt(attemptHistory, quiz.id);
+  if (!savedProgress?.completedAt || !lastAttempt) {
     return <ResultState lessonId={lessonId} missingQuiz={false} />;
   }
 
-  const { correctAnswerCount, incorrectAnswerCount, percentage } = getQuizScore(
-    quiz,
-    validAnswers,
-  );
-  const answersByQuestionId = new Map(
-    validAnswers.map((answer) => [answer.questionId, answer.selectedOptionId]),
-  );
-  const incorrectQuestions = quiz.questions.filter(
-    (question) => answersByQuestionId.get(question.id) !== question.correctOptionId,
-  );
-  const awardedXp = savedProgress.awardedXp
-    ?? getQuizAwardXp(quiz, savedProgress.bestCorrectAnswerCount);
+  const lastScore = getQuizAttemptScore(lastAttempt);
+  const lastFullScore = getLastQuizScore(attemptHistory, quiz.id);
+  const bestScore = getBestQuizScore(attemptHistory, quiz.id) ?? lastFullScore;
+  const incorrectQuestions = getQuizRetryQuestions(quiz, lastAttempt);
+  const incorrectQuestionIds = new Set(incorrectQuestions.map((question) => question.id));
+  const attemptedQuestionIds = new Set(savedProgress.answers.map((answer) => answer.questionId));
+  const resultQuestions = lastAttempt.attemptType === 'retry'
+    ? quiz.questions.filter((question) => attemptedQuestionIds.has(question.id))
+    : quiz.questions;
+  const firstAttempt = attemptHistory.find((attempt) => attempt.quizId === quiz.id);
+  const awardedXp = firstAttempt === lastAttempt ? savedProgress.awardedXp : undefined;
+  const quizPath = `/learn/${quiz.lessonId}/quiz/${quiz.id}`;
 
   return (
     <Screen
@@ -99,12 +115,14 @@ export function QuizResultScreen({ lessonId, quizId }: Props) {
       scrollViewProps={{ contentInsetAdjustmentBehavior: 'automatic' }}
     >
       <View style={styles.hero}>
-        <Badge variant="success">Quiz tamamlandı</Badge>
+        <Badge variant={lastScore.score === 100 ? 'success' : 'info'}>
+          {lastScore.score === 100 ? 'Mükemmel sonuç' : 'Quiz tamamlandı'}
+        </Badge>
         <View style={styles.copy}>
           <Typography color="primary" variant="caption">QUIZ SONUCU</Typography>
           <Typography accessibilityRole="header" variant="h1">{quiz.title}</Typography>
           <Typography color="textSecondary" style={styles.bodyLine} variant="bodyLarge">
-            {evaluationFor(percentage)}
+            {evaluationFor(lastScore.score)}
           </Typography>
         </View>
       </View>
@@ -112,50 +130,77 @@ export function QuizResultScreen({ lessonId, quizId }: Props) {
       <Card raised style={styles.scoreCard}>
         <View style={styles.scoreTop}>
           <View style={styles.scoreCopy}>
-            <Typography color="textMuted" variant="caption">SKORUN</Typography>
-            <Typography accessibilityLabel={`Yüzde ${percentage}`} style={styles.percentage} variant="displayCompact">
-              %{percentage}
+            <Typography color="textMuted" variant="caption">
+              {lastAttempt.attemptType === 'retry' ? 'RETRY SONUCU' : 'SON SKOR'}
+            </Typography>
+            <Typography accessibilityLabel={`Yüzde ${lastScore.score}`} style={styles.percentage} variant="displayCompact">
+              %{lastScore.score}
             </Typography>
           </View>
-          <Badge variant="primary">En iyi: {savedProgress.bestCorrectAnswerCount}/{quiz.questions.length}</Badge>
+          {bestScore ? <Badge variant="primary">En iyi tam quiz: %{bestScore.score}</Badge> : null}
         </View>
-        <Progress accessibilityLabel={`Quiz skoru yüzde ${percentage}`} color="success" value={percentage} />
+        <Progress
+          accessibilityLabel={`Son quiz skoru yüzde ${lastScore.score}`}
+          color={lastScore.score === 100 ? 'success' : 'primary'}
+          value={lastScore.score}
+        />
         <View style={styles.summaryRow}>
           <View style={styles.summaryItem}>
-            <Typography color="success" variant="h3">{correctAnswerCount}</Typography>
+            <Typography color="success" variant="h3">{lastScore.correctCount}</Typography>
             <Typography color="textSecondary">Doğru</Typography>
           </View>
           <View style={styles.summaryItem}>
-            <Typography color={incorrectAnswerCount ? 'error' : 'textMuted'} variant="h3">{incorrectAnswerCount}</Typography>
+            <Typography color={lastScore.wrongCount ? 'error' : 'textMuted'} variant="h3">{lastScore.wrongCount}</Typography>
             <Typography color="textSecondary">Yanlış</Typography>
           </View>
           <View style={styles.summaryItem}>
-            <Typography color="primary" variant="h3">+{awardedXp}</Typography>
-            <Typography color="textSecondary">İlk tamamlama XP</Typography>
+            <Typography color={awardedXp ? 'primary' : 'textMuted'} variant="h3">+{awardedXp ?? 0}</Typography>
+            <Typography color="textSecondary">Bu denemede XP</Typography>
           </View>
         </View>
+        {lastFullScore && bestScore ? (
+          <View style={styles.scoreComparison}>
+            <Typography color="textSecondary" variant="small">
+              Son tam quiz: {lastFullScore.correctCount}/{lastFullScore.correctCount + lastFullScore.wrongCount}
+            </Typography>
+            <Typography color="textSecondary" variant="small">
+              En iyi tam quiz: {bestScore.correctCount}/{bestScore.correctCount + bestScore.wrongCount}
+            </Typography>
+          </View>
+        ) : null}
       </Card>
 
-      {incorrectQuestions.length ? (
-        <View style={styles.reviewSection}>
-          <View style={styles.copy}>
-            <Typography color="warning" variant="caption">KISA REVIEW</Typography>
-            <Typography accessibilityRole="header" variant="h2">Tekrar göz at</Typography>
-          </View>
-          {incorrectQuestions.map((question) => {
-            const correctOption = question.options.find((option) => option.id === question.correctOptionId);
-            return (
-              <Card key={question.id} style={styles.reviewCard}>
-                <Typography accessibilityRole="header" variant="h4">{question.prompt}</Typography>
-                {correctOption ? (
-                  <Typography color="success">Doğru cevap: {correctOption.label}</Typography>
-                ) : null}
-                <Typography color="textSecondary" style={styles.bodyLine}>{question.explanation}</Typography>
-              </Card>
-            );
-          })}
+      <View style={styles.reviewSection}>
+        <View style={styles.copy}>
+          <Typography color="primary" variant="caption">CEVAP DETAYI</Typography>
+          <Typography accessibilityRole="header" variant="h2">Soruların</Typography>
         </View>
-      ) : null}
+        {resultQuestions.map((question) => {
+          const incorrect = incorrectQuestionIds.has(question.id);
+          const questionNumber = quiz.questions.findIndex((item) => item.id === question.id) + 1;
+          const correctOption = question.options.find((option) => option.id === question.correctOptionId);
+          return (
+            <Card
+              accessibilityLabel={`Soru ${questionNumber}, ${incorrect ? 'yanlış' : 'doğru'}`}
+              key={question.id}
+              style={[styles.reviewCard, incorrect ? styles.incorrectCard : styles.correctCard]}
+            >
+              <View style={styles.questionHeading}>
+                <Typography accessibilityRole="header" style={styles.questionTitle} variant="h4">
+                  {questionNumber}. {question.prompt}
+                </Typography>
+                <Badge variant={incorrect ? 'error' : 'success'}>{incorrect ? 'Yanlış' : 'Doğru'}</Badge>
+              </View>
+              {correctOption ? (
+                <Typography color="success">Doğru cevap: {correctOption.label}</Typography>
+              ) : null}
+              {question.explanation ? (
+                <Typography color="textSecondary" style={styles.bodyLine}>{question.explanation}</Typography>
+              ) : null}
+            </Card>
+          );
+        })}
+      </View>
 
       <Card style={styles.actionsCard}>
         <View style={styles.copy}>
@@ -165,12 +210,24 @@ export function QuizResultScreen({ lessonId, quizId }: Props) {
           </Typography>
         </View>
         <View style={styles.actionRow}>
+          {incorrectQuestions.length ? (
+            <Button
+              onPress={() => router.replace(
+                `${quizPath}?retryAttemptAt=${encodeURIComponent(lastAttempt.completedAt)}` as Href,
+              )}
+              size="large"
+              style={styles.actionButton}
+            >
+              Yanlışları Tekrarla
+            </Button>
+          ) : null}
           <Button
-            onPress={() => router.replace(`/learn/${quiz.lessonId}/quiz/${quiz.id}` as Href)}
+            onPress={() => router.replace(quizPath as Href)}
             size="large"
             style={styles.actionButton}
+            variant={incorrectQuestions.length ? 'secondary' : 'primary'}
           >
-            Quizi Tekrarla
+            Quizi Tekrar Çöz
           </Button>
           <Button
             onPress={() => router.replace(`/learn/${quiz.lessonId}` as Href)}
@@ -206,8 +263,13 @@ const styles = StyleSheet.create({
   percentage: { color: colors.text },
   summaryRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   summaryItem: { backgroundColor: colors.surface, borderRadius: radius.md, flexGrow: 1, gap: spacing.xxs, minWidth: 120, padding: spacing.md },
+  scoreComparison: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, justifyContent: 'space-between' },
   reviewSection: { gap: spacing.md },
   reviewCard: { gap: spacing.sm, padding: spacing.lg },
+  correctCard: { borderColor: colors.success },
+  incorrectCard: { borderColor: colors.error },
+  questionHeading: { alignItems: 'flex-start', flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, justifyContent: 'space-between' },
+  questionTitle: { flex: 1, minWidth: 200 },
   actionsCard: { gap: spacing.xl, padding: spacing.xl },
   actionRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   actionButton: { flexGrow: 1 },
