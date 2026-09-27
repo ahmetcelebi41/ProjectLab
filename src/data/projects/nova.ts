@@ -4,7 +4,7 @@ export const novaProject = {
   id: 'nova',
   title: 'NOVA',
   type: 'dashboard',
-  status: 'in-progress',
+  status: 'completed',
   summary: 'Sipariş, stok ve müşteri operasyonlarını ortak panelde yöneten full-stack ürün.',
   purpose: 'Dağınık operasyon verilerini anlaşılır bir yönetim deneyiminde bir araya getirmek.',
   technologies: ['TypeScript', 'React', 'Cloudflare Workers', 'D1'],
