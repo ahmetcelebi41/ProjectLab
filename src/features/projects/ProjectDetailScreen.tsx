@@ -25,6 +25,15 @@ import type {
   Quiz,
 } from '@/types';
 
+import {
+  formatProjectStageDate,
+  getOrderedProjectStages,
+  getUniqueTechnologies,
+  ProjectLearningList,
+  ProjectMilestoneList,
+  ProjectTechnologyList,
+} from './ProjectDetailComponents';
+
 export type ProjectDetailSection = 'overview' | 'journey' | 'learn' | 'quiz';
 
 type Props = { projectId?: string; section?: ProjectDetailSection };
@@ -162,9 +171,7 @@ function ProjectHero({ isWide, project }: { isWide: boolean; project: Project })
           </Typography>
           <Typography style={styles.bodyLine}>{project.purpose}</Typography>
         </View>
-        <View accessibilityLabel="Proje teknolojileri" style={styles.badgeRow}>
-          {project.technologies.map((technology) => <Badge key={technology}>{technology}</Badge>)}
-        </View>
+        <ProjectTechnologyList technologies={project.technologies} />
         {liveLink || sourceLink ? (
           <View style={styles.actionRow}>
             {liveLink ? <Button accessibilityRole="link" onPress={() => Linking.openURL(liveLink.url)} variant="secondary">{liveLink.label}</Button> : null}
@@ -293,20 +300,22 @@ function JourneyPreview({ project, showAllAction = true }: {
 }) {
   const completedIds = getCompletedProjectStageIds(project);
   const activeId = getActiveProjectStageId(project);
+  const orderedStages = getOrderedProjectStages(project.stages);
 
   return (
     <View style={styles.section}>
       <SectionHeading
         actionHref={showAllAction ? `/projects/${project.id}/journey` as Href : undefined}
         actionLabel={showAllAction ? 'Tüm Yolculuk' : undefined}
-        description="Fikirden sonuca proje aşamaları ve önemli kararlar."
-        title="Proje Yolculuğu"
+        description="Proje sürecinin fikirden sonuca kronolojik akışı."
+        title="Proje Timeline’ı"
       />
       <View accessibilityLabel={`${project.title} proje aşamaları`} style={styles.timeline}>
-        {project.stages.map((stage, index) => {
+        {orderedStages.map((stage, index) => {
           const status = getStageStatus(stage, completedIds, activeId);
           const detail = stageStatuses[status];
           const active = stage.id === activeId;
+          const date = formatProjectStageDate(stage.date);
 
           return (
             <View key={stage.id} style={styles.timelineItem}>
@@ -316,9 +325,10 @@ function JourneyPreview({ project, showAllAction = true }: {
                     {String(stage.order).padStart(2, '0')}
                   </Typography>
                 </View>
-                {index < project.stages.length - 1 ? <View style={styles.timelineLine} /> : null}
+                {index < orderedStages.length - 1 ? <View style={styles.timelineLine} /> : null}
               </View>
               <Card raised={active} style={[styles.stageCard, active && styles.activeStageCard]}>
+                {date ? <Typography color="textMuted" variant="caption">{date}</Typography> : null}
                 <View style={styles.stageHeader}>
                   <Typography accessibilityRole="header" style={styles.stageTitle} variant="h4">{stage.title}</Typography>
                   <Badge variant={detail.variant}>{detail.label}</Badge>
@@ -335,6 +345,34 @@ function JourneyPreview({ project, showAllAction = true }: {
           );
         })}
       </View>
+    </View>
+  );
+}
+
+function MilestonesSection({ project }: { project: Project }) {
+  if (!project.stages.length) return null;
+
+  return (
+    <View style={styles.section}>
+      <SectionHeading
+        description="Önemli proje aşamalarının güncel durumları."
+        title="Kilometre Taşları"
+      />
+      <ProjectMilestoneList stages={project.stages} />
+    </View>
+  );
+}
+
+function ProjectLearningsSection({ project }: { project: Project }) {
+  if (!project.learnings?.length) return null;
+
+  return (
+    <View style={styles.section}>
+      <SectionHeading
+        description="Proje sürecinden çıkan kısa ve uygulanabilir notlar."
+        title="Bu Projede Ne Öğrendim?"
+      />
+      <ProjectLearningList learnings={project.learnings} />
     </View>
   );
 }
@@ -402,7 +440,7 @@ function LearningSection({ cardWidth, lessons, project, quizzes, showAllAction =
         actionHref={showAllAction ? `/projects/${project.id}/learn` as Href : undefined}
         actionLabel={showAllAction ? 'Tümünü Gör' : undefined}
         description="Projede karşılaşılan teknik ve tasarımsal konular."
-        title="Öğrendiklerim"
+        title="İlgili Öğrenme İçerikleri"
       />
       {lessons.length || quizzes.length ? (
         <View style={styles.grid}>
@@ -445,11 +483,14 @@ function QuizSection({ cardWidth, project, quizzes }: {
 }
 
 function Technologies({ project }: { project: Project }) {
+  const technologies = getUniqueTechnologies(project.technologies);
+  if (!technologies.length) return null;
+
   return (
     <View style={styles.section}>
-      <SectionHeading title="Teknolojiler" />
-      <Card style={styles.technologyCard}>
-        {project.technologies.map((technology) => <Badge key={technology} variant="primary">{technology}</Badge>)}
+      <SectionHeading title="Kullanılan Teknolojiler" />
+      <Card>
+        <ProjectTechnologyList technologies={technologies} />
       </Card>
     </View>
   );
@@ -521,6 +562,8 @@ export function ProjectDetailScreen({ projectId, section = 'overview' }: Props) 
         <>
           <ProgressSummary project={project} />
           <JourneyPreview project={project} />
+          <MilestonesSection project={project} />
+          <ProjectLearningsSection project={project} />
           <LearningSection
             cardWidth={cardWidth}
             lessons={getLessonsByProjectId(project.id)}
@@ -532,16 +575,22 @@ export function ProjectDetailScreen({ projectId, section = 'overview' }: Props) 
         </>
       ) : null}
       {section === 'journey' ? (
-        <JourneyPreview project={project} showAllAction={false} />
+        <>
+          <JourneyPreview project={project} showAllAction={false} />
+          <MilestonesSection project={project} />
+        </>
       ) : null}
       {section === 'learn' ? (
-        <LearningSection
-          cardWidth={cardWidth}
-          lessons={getLessonsByProjectId(project.id)}
-          project={project}
-          quizzes={[]}
-          showAllAction={false}
-        />
+        <>
+          <ProjectLearningsSection project={project} />
+          <LearningSection
+            cardWidth={cardWidth}
+            lessons={getLessonsByProjectId(project.id)}
+            project={project}
+            quizzes={[]}
+            showAllAction={false}
+          />
+        </>
       ) : null}
       {section === 'quiz' ? (
         <QuizSection
@@ -563,7 +612,6 @@ const styles = StyleSheet.create({
   heroCopy: { gap: spacing.sm },
   heroSummary: { lineHeight: spacing.xl, maxWidth: layout.readingWidth.min },
   bodyLine: { lineHeight: spacing.lg },
-  badgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
   actionRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   cover: {
     backgroundColor: colors.surfaceRaised,
@@ -622,7 +670,6 @@ const styles = StyleSheet.create({
   cardMeta: { alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, justifyContent: 'space-between' },
   cardCopy: { gap: spacing.xs },
   emptyCard: { gap: spacing.sm },
-  technologyCard: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   resultCard: { gap: spacing.xl, padding: spacing.xl },
   resultSummary: { lineHeight: spacing.xl, maxWidth: layout.readingWidth.max },
   highlightList: { gap: spacing.sm },

@@ -19,6 +19,7 @@ export type ProjectImage = Readonly<{
 export type ProjectStage = Readonly<{
   id: string;
   order: number;
+  date?: string;
   title: string;
   summary: string;
   status: ProjectStageStatus;
@@ -37,6 +38,7 @@ export type Project = Readonly<{
   summary: string;
   purpose: string;
   technologies: readonly string[];
+  learnings?: readonly string[];
   featured: boolean;
   portfolioVisible: boolean;
   updatedAt: string;

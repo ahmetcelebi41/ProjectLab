@@ -8,6 +8,11 @@ export const moonphaseProject = {
   summary: 'Ürün keşfini kategori yapısı ve güçlü görsel sunumla destekleyen e-ticaret deneyimi.',
   purpose: 'Mobil kullanıcıların ürünleri kolayca keşfedip karşılaştırabileceği anlaşılır bir katalog kurmak.',
   technologies: ['TypeScript', 'React Native', 'E-commerce', 'Product Design'],
+  learnings: [
+    'Kategoriler kullanıcıların zihinsel modelini izler.',
+    'Ürün özellikleri tutarlı alanlarla tanımlanır.',
+    'Filtreleme ihtiyaçları veri modeline erken yansıtılır.',
+  ],
   featured: false,
   portfolioVisible: true,
   updatedAt: '2026-09-12',

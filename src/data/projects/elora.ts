@@ -8,6 +8,11 @@ export const eloraProject = {
   summary: 'Kurumsal anlatımı ve rezervasyon akışını ortak bir web deneyiminde buluşturan proje.',
   purpose: 'Markayı güven veren bir arayüzle sunmak ve rezervasyon yolculuğunu sadeleştirmek.',
   technologies: ['TypeScript', 'React', 'Design System', 'Responsive UI'],
+  learnings: [
+    'Tekrarlanan tasarım kararları merkezileşir.',
+    'Bileşenler ortak bir görsel sözlük kullanır.',
+    'Tema ve ölçek değişiklikleri daha kontrollü yapılır.',
+  ],
   featured: true,
   portfolioVisible: true,
   updatedAt: '2026-09-18',

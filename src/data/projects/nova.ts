@@ -8,6 +8,11 @@ export const novaProject = {
   summary: 'Sipariş, stok ve müşteri operasyonlarını ortak panelde yöneten full-stack ürün.',
   purpose: 'Dağınık operasyon verilerini anlaşılır bir yönetim deneyiminde bir araya getirmek.',
   technologies: ['TypeScript', 'React', 'Cloudflare Workers', 'D1'],
+  learnings: [
+    'İstemci ve servis aynı veri beklentisini paylaşır.',
+    'İç veri modeli ile dış temsil ayrı evrilebilir.',
+    'Geriye uyumlu değişiklikler daha kolay planlanır.',
+  ],
   featured: true,
   portfolioVisible: true,
   updatedAt: '2026-09-24',
