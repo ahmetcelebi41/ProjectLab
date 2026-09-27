@@ -323,7 +323,7 @@ const styles = StyleSheet.create({
   cardPressable: { borderColor: 'transparent', borderRadius: radius.card, borderWidth: border.width },
   cardFocused: { borderColor: colors.primaryHover },
   cardPressed: { opacity: border.width / 2 },
-  projectCard: { gap: spacing.lg, height: '100%', padding: spacing.sm },
+  projectCard: { gap: spacing.lg, padding: spacing.sm },
   cover: {
     backgroundColor: colors.surfaceRaised,
     borderColor: colors.border,
