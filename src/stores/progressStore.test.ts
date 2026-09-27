@@ -1,20 +1,38 @@
 import { lessonsById, projectsById, quizzesById } from '@/data';
 import { getCompletedProjectStageIds } from '@/features/progress/projectProgress';
 import { getQuizAwardXp } from '@/features/progress/rewards';
-import { PROGRESS_SCHEMA_VERSION, type QuizProgress } from '@/types';
+import {
+  PROGRESS_SCHEMA_VERSION,
+  type Quiz,
+  type QuizAnswer,
+  type QuizProgress,
+} from '@/types';
 
 import { useProgressStore } from './progressStore';
 
 const completedAt = '2026-09-26T00:00:00.000Z';
 const quiz = quizzesById['design-tokens-quiz'];
 
-function quizResult(bestCorrectAnswerCount: number): QuizProgress {
+function answersFor(targetQuiz: Quiz, correctAnswerCount: number): readonly QuizAnswer[] {
+  return targetQuiz.questions.map((question, index) => ({
+    questionId: question.id,
+    selectedOptionId: index < correctAnswerCount
+      ? question.correctOptionId
+      : question.options.find((option) => option.id !== question.correctOptionId)!.id,
+  }));
+}
+
+function quizResult(
+  bestCorrectAnswerCount: number,
+  resultCompletedAt = completedAt,
+  targetQuiz: Quiz = quiz,
+): QuizProgress {
   return {
-    quizId: quiz.id,
-    currentQuestionIndex: quiz.questions.length - 1,
-    answers: [],
+    quizId: targetQuiz.id,
+    currentQuestionIndex: targetQuiz.questions.length - 1,
+    answers: answersFor(targetQuiz, bestCorrectAnswerCount),
     bestCorrectAnswerCount,
-    completedAt,
+    completedAt: resultCompletedAt,
   };
 }
 
@@ -157,7 +175,7 @@ describe('progressStore', () => {
     const store = useProgressStore.getState();
 
     store.saveQuizResult(quizResult(3));
-    store.saveQuizResult(quizResult(1));
+    store.saveQuizResult(quizResult(1, '2026-09-27T00:00:00.000Z'));
 
     const state = useProgressStore.getState();
     expect(state.totalXp).toBe(getQuizAwardXp(quiz, 3));
@@ -170,13 +188,73 @@ describe('progressStore', () => {
 
     store.saveQuizResult(quizResult(1));
     const firstCompletionXp = useProgressStore.getState().totalXp;
-    store.saveQuizResult(quizResult(3));
+    store.saveQuizResult(quizResult(3, '2026-09-27T00:00:00.000Z'));
 
     const state = useProgressStore.getState();
     expect(firstCompletionXp).toBe(quiz.completionXp);
     expect(state.totalXp).toBe(firstCompletionXp);
     expect(state.quizzes[0].bestCorrectAnswerCount).toBe(3);
     expect(state.quizzes[0].awardedXp).toBe(quiz.completionXp);
+  });
+
+  it('gecerli quiz completionlarini sirali history olarak saklar ve event duplicate etmez', () => {
+    const firstAttempt = quizResult(1);
+    const secondCompletedAt = '2026-09-27T00:00:00.000Z';
+    const secondAttempt = quizResult(2, secondCompletedAt);
+
+    useProgressStore.getState().saveQuizResult(firstAttempt);
+    const firstCompletionXp = useProgressStore.getState().totalXp;
+    useProgressStore.getState().saveQuizResult(firstAttempt);
+    expect(useProgressStore.getState().totalXp).toBe(firstCompletionXp);
+    useProgressStore.getState().saveQuizResult(secondAttempt);
+    expect(useProgressStore.getState().totalXp).toBe(firstCompletionXp);
+
+    expect(useProgressStore.getState().quizHistory).toEqual([
+      {
+        quizId: quiz.id,
+        completedAt,
+        correctAnswerCount: 1,
+        questionCount: quiz.questions.length,
+        wrongQuestionIds: quiz.questions.slice(1).map((question) => question.id),
+      },
+      {
+        quizId: quiz.id,
+        completedAt: secondCompletedAt,
+        correctAnswerCount: 2,
+        questionCount: quiz.questions.length,
+        wrongQuestionIds: [quiz.questions[2].id],
+      },
+    ]);
+  });
+
+  it('baska quiz attemptini bagimsiz saklar ve mevcut progress verisini korur', () => {
+    const otherQuiz = quizzesById['api-contracts-quiz'];
+    const existingLesson = { lessonId: 'design-tokens', completedAt } as const;
+    const existingProject = { projectId: 'nova', lastVisitedAt: completedAt } as const;
+    useProgressStore.setState({
+      totalXp: 25,
+      lessons: [existingLesson],
+      projects: [existingProject],
+      earnedAchievementIds: ['first-lesson'],
+    });
+
+    useProgressStore.getState().saveQuizResult(quizResult(1));
+    const firstQuizAward = getQuizAwardXp(quiz, 1);
+    useProgressStore.getState().saveQuizResult(quizResult(3, completedAt, otherQuiz));
+
+    const state = useProgressStore.getState();
+    expect(state.totalXp).toBe(25 + firstQuizAward + getQuizAwardXp(otherQuiz, 3));
+    expect(state.quizHistory.map((attempt) => attempt.quizId)).toEqual([
+      quiz.id,
+      otherQuiz.id,
+    ]);
+    expect(state.quizzes.map((progress) => progress.quizId)).toEqual([
+      quiz.id,
+      otherQuiz.id,
+    ]);
+    expect(state.lessons).toEqual([existingLesson]);
+    expect(state.projects).toEqual([existingProject]);
+    expect(state.earnedAchievementIds).toEqual(['first-lesson']);
   });
 
   it('proje ziyareti yalnız lastVisitedAt metadata alanını kaydeder', () => {

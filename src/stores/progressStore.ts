@@ -6,6 +6,10 @@ import { evaluateAchievements } from '@/features/achievements/evaluateAchievemen
 import { isLessonCompleted } from '@/features/progress/lessonProgress';
 import { getQuizAwardXp } from '@/features/progress/rewards';
 import {
+  createQuizAttempt,
+  isSameQuizCompletionEvent,
+} from '@/features/quiz/quizAttempts';
+import {
   migrateProgressState,
   PROGRESS_STORAGE_KEY,
   PROGRESS_STORAGE_VERSION,
@@ -134,10 +138,15 @@ export const useProgressStore = create<ProgressStore>()(
         saveQuizResult: (result) => {
           set((state) => {
             const current = state.quizzes.find((item) => item.quizId === result.quizId);
-            const isFirstCompletion = !current?.completedAt && Boolean(result.completedAt);
             const quiz = quizzesById[result.quizId];
+            const attempt = result.completedAt
+              ? createQuizAttempt(quiz, result.answers, result.completedAt)
+              : undefined;
+            const isFirstCompletion = !current?.completedAt && attempt !== undefined;
+            const correctAnswerCount = attempt?.correctAnswerCount
+              ?? result.bestCorrectAnswerCount;
             const awardedXp = current?.awardedXp
-              ?? (isFirstCompletion ? getQuizAwardXp(quiz, result.bestCorrectAnswerCount) : undefined);
+              ?? (isFirstCompletion ? getQuizAwardXp(quiz, correctAnswerCount) : undefined);
             const next: QuizProgress = {
               ...result,
               answers: [
@@ -147,16 +156,23 @@ export const useProgressStore = create<ProgressStore>()(
               ],
               bestCorrectAnswerCount: Math.max(
                 current?.bestCorrectAnswerCount ?? 0,
-                result.bestCorrectAnswerCount,
+                correctAnswerCount,
               ),
               awardedXp,
-              completedAt: current?.completedAt ?? result.completedAt,
+              completedAt: current?.completedAt ?? attempt?.completedAt,
             };
+            const shouldSaveAttempt = attempt !== undefined
+              && !state.quizHistory.some((savedAttempt) => (
+                isSameQuizCompletionEvent(savedAttempt, attempt)
+              ));
 
             return {
               totalXp: isFirstCompletion
                 ? state.totalXp + (awardedXp ?? quiz.completionXp)
                 : state.totalXp,
+              quizHistory: shouldSaveAttempt
+                ? [...state.quizHistory, attempt]
+                : state.quizHistory,
               quizzes: replaceById(
                 state.quizzes,
                 (item) => item.quizId === result.quizId,
