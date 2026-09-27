@@ -477,7 +477,7 @@ const styles = StyleSheet.create({
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md },
   cardPressable: { borderColor: 'transparent', borderRadius: radius.card, borderWidth: border.width },
   cardPressed: { backgroundColor: colors.surfaceRaised },
-  lessonCard: { gap: spacing.lg, height: '100%' },
+  lessonCard: { gap: spacing.lg },
   cardTop: { alignItems: 'flex-start', flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, justifyContent: 'space-between' },
   cardCopy: { flex: 1, gap: spacing.xs },
   cardSummary: { lineHeight: spacing.lg },
