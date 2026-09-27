@@ -20,12 +20,22 @@ import { Typography } from '@/components/ui/Typography';
 import { getLessonById } from '@/data/lessons';
 import { getProjectById } from '@/data/projects';
 import { getQuizById } from '@/data/quizzes';
+import { isLessonCompleted } from '@/features/progress/lessonProgress';
 import { useProgressStore } from '@/stores/progressStore';
 import { border, colors, layout, radius, spacing, typography } from '@/theme/tokens';
 import type { Lesson, LessonCategory, LessonContentBlock } from '@/types';
 
 type Props = { lessonId?: string };
 type BlockPosition = { bottom: number; index: number };
+
+function nextActivityTimestamp(previousTimestamp?: string): string {
+  const previousTime = previousTimestamp ? Date.parse(previousTimestamp) : Number.NaN;
+  const currentTime = Date.now();
+
+  return new Date(
+    Number.isFinite(previousTime) ? Math.max(currentTime, previousTime + 1) : currentTime,
+  ).toISOString();
+}
 
 const categoryLabels: Record<LessonCategory, string> = {
   'ui-ux': 'UI/UX',
@@ -182,6 +192,15 @@ function LessonHeader({ lesson }: { lesson: Lesson }) {
 function LessonActions({ completed, lesson }: { completed: boolean; lesson: Lesson }) {
   const quiz = lesson.quizId ? getQuizById(lesson.quizId) : undefined;
 
+  const handleComplete = () => {
+    if (completed) return;
+
+    const progressStore = useProgressStore.getState();
+    const occurredAt = nextActivityTimestamp(progressStore.lastActivity?.occurredAt);
+    progressStore.completeLesson(lesson.id, occurredAt);
+    progressStore.setLastActivity({ type: 'lesson', lessonId: lesson.id }, occurredAt);
+  };
+
   return (
     <Card raised style={styles.actionCard}>
       <View style={styles.sectionCopy}>
@@ -198,26 +217,25 @@ function LessonActions({ completed, lesson }: { completed: boolean; lesson: Less
         </Typography>
       </View>
       <View style={styles.actionRow}>
-        <Button
-          accessibilityLabel={`${lesson.title} dersini tamamla`}
-          disabled={completed}
-          onPress={() => {
-            useProgressStore.getState().completeLesson(lesson.id);
-          }}
-          size="large"
-          style={styles.actionButton}
-        >
-          {completed ? 'Ders Tamamlandı' : 'Dersi Tamamla'}
-        </Button>
+        {!completed ? (
+          <Button
+            accessibilityLabel={`${lesson.title} dersini tamamla`}
+            onPress={handleComplete}
+            size="large"
+            style={styles.actionButton}
+          >
+            Dersi Tamamla
+          </Button>
+        ) : null}
         {quiz ? (
           <Button
             accessibilityLabel={`${quiz.title} quizini aç`}
             onPress={() => router.push(`/learn/${lesson.id}/quiz/${quiz.id}` as Href)}
             size="large"
             style={styles.actionButton}
-            variant="secondary"
+            variant={completed ? 'primary' : 'secondary'}
           >
-            Bilgini Test Et
+            {completed ? 'Quize Geç' : 'Bilgini Test Et'}
           </Button>
         ) : (
           <Button onPress={() => router.push('/learn')} size="large" style={styles.actionButton} variant="secondary">
@@ -239,6 +257,7 @@ export function LessonDetailScreen({ lessonId }: Props) {
   const blockPositions = useRef(new Map<string, BlockPosition>());
   const contentTop = useRef(0);
   const furthestIndex = useRef(-1);
+  const activityLessonId = useRef<string | null>(null);
 
   const currentBlockIndex = useMemo(() => {
     if (!lesson || !lessonProgress?.lastBlockId) return -1;
@@ -253,6 +272,13 @@ export function LessonDetailScreen({ lessonId }: Props) {
   useEffect(() => {
     furthestIndex.current = currentBlockIndex;
   }, [currentBlockIndex, lessonId]);
+
+  useEffect(() => {
+    if (!hasHydrated || !lesson || activityLessonId.current === lesson.id) return;
+
+    activityLessonId.current = lesson.id;
+    useProgressStore.getState().setLastActivity({ type: 'lesson', lessonId: lesson.id });
+  }, [hasHydrated, lesson]);
 
   useEffect(() => {
     if (!hasHydrated || !lesson || lessonProgress?.completedAt || lessonProgress?.lastBlockId || !lesson.content[0]) return;
@@ -277,7 +303,7 @@ export function LessonDetailScreen({ lessonId }: Props) {
   if (!lesson) return <LessonNotFound lessonId={lessonId} />;
   if (!hasHydrated) return <LoadingLesson />;
 
-  const completed = Boolean(lessonProgress?.completedAt);
+  const completed = isLessonCompleted(lessonProgress ? [lessonProgress] : [], lesson.id);
   const readBlockCount = completed ? lesson.content.length : Math.max(0, currentBlockIndex + 1);
   const progressValue = lesson.content.length
     ? Math.round((readBlockCount / lesson.content.length) * 100)

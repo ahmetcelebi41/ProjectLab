@@ -11,6 +11,7 @@ import { Screen } from '@/components/ui/Screen';
 import { Typography } from '@/components/ui/Typography';
 import { lessons } from '@/data/lessons';
 import { projects, projectsById } from '@/data/projects';
+import { getTopicProgressPercentage, isLessonCompleted } from '@/features/progress/lessonProgress';
 import { useProgressStore } from '@/stores/progressStore';
 import {
   border,
@@ -136,9 +137,7 @@ function LoadingLearn() {
 }
 
 function LearningSummary({ progress }: { progress: readonly LessonProgress[] }) {
-  const completedCount = lessons.filter(
-    (lesson) => getLessonStatus(progress.find((item) => item.lessonId === lesson.id)) === 'completed',
-  ).length;
+  const completedCount = lessons.filter((lesson) => isLessonCompleted(progress, lesson.id)).length;
   const activeCount = lessons.filter(
     (lesson) => getLessonStatus(progress.find((item) => item.lessonId === lesson.id)) === 'in-progress',
   ).length;
@@ -294,14 +293,25 @@ function LessonCard({ lesson, progress, width }: {
   );
 }
 
-function ProjectLearningCard({ project, width }: { project: Project; width: number }) {
+function ProjectLearningCard({ progress, project, width }: {
+  progress: readonly LessonProgress[];
+  project: Project;
+  width: number;
+}) {
   const [focusedLessonId, setFocusedLessonId] = useState<string | null>(null);
   const projectLessons = lessons.filter((lesson) =>
     lesson.projectIds.some((projectId) => projectId === project.id),
   );
+  const completedCount = project.lessonIds.filter((lessonId) => (
+    isLessonCompleted(progress, lessonId)
+  )).length;
+  const progressValue = getTopicProgressPercentage(project.lessonIds, progress);
 
   return (
-    <Card style={[styles.projectCard, { width }]}>
+    <Card
+      accessibilityLabel={`${project.title}, ${project.lessonIds.length} dersten ${completedCount} tamamlandı, yüzde ${progressValue}`}
+      style={[styles.projectCard, { width }]}
+    >
       <View style={styles.projectMonogram}>
         <Typography color="primary" variant="h3">{project.title.slice(0, 1)}</Typography>
       </View>
@@ -310,6 +320,21 @@ function ProjectLearningCard({ project, width }: { project: Project; width: numb
         <Typography color="textSecondary" numberOfLines={2} style={styles.bodyLine}>
           {project.summary}
         </Typography>
+      </View>
+      <View style={styles.projectProgress}>
+        <View style={styles.metricRow}>
+          <Typography color="textSecondary" variant="caption">
+            {completedCount}/{project.lessonIds.length} ders tamamlandı
+          </Typography>
+          <Typography color={progressValue === 100 ? 'success' : 'primary'} variant="caption">
+            %{progressValue}
+          </Typography>
+        </View>
+        <Progress
+          accessibilityLabel={`${project.title} ders ilerlemesi yüzde ${progressValue}`}
+          color={progressValue === 100 ? 'success' : 'primary'}
+          value={progressValue}
+        />
       </View>
       <View style={styles.projectLessonList}>
         {projectLessons.map((lesson) => (
@@ -449,7 +474,12 @@ export function LearnScreen() {
         />
         <View style={styles.grid}>
           {projects.map((project) => (
-            <ProjectLearningCard key={project.id} project={project} width={cardWidth} />
+            <ProjectLearningCard
+              key={project.id}
+              progress={storedProgress}
+              project={project}
+              width={cardWidth}
+            />
           ))}
         </View>
       </View>
@@ -486,6 +516,7 @@ const styles = StyleSheet.create({
   metaRow: { flexDirection: 'row', justifyContent: 'space-between' },
   cardAction: { alignItems: 'center', flexDirection: 'row', gap: spacing.xs, justifyContent: 'flex-end', minHeight: sizing.touchTarget.minHeight },
   projectCard: { gap: spacing.md },
+  projectProgress: { gap: spacing.xs },
   projectMonogram: { alignItems: 'center', backgroundColor: colors.surfaceRaised, borderColor: colors.border, borderRadius: radius.md, borderWidth: border.width, height: sizing.button.large, justifyContent: 'center', width: sizing.button.large },
   projectLessonList: { borderTopColor: colors.border, borderTopWidth: border.width, paddingTop: spacing.xs },
   projectLessonLink: { alignItems: 'center', borderColor: 'transparent', borderRadius: radius.sm, borderWidth: border.width, flexDirection: 'row', gap: spacing.sm, justifyContent: 'space-between', minHeight: sizing.touchTarget.minHeight },
