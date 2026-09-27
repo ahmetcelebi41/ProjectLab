@@ -11,6 +11,7 @@ import { Typography } from '@/components/ui/Typography';
 import { achievements, lessons, projects, quizzes } from '@/data';
 import { getLevelProgress, XP_PER_LEVEL } from '@/features/progress/level';
 import { getCompletedProjectStageIds } from '@/features/progress/projectProgress';
+import { getProfileLearningStats } from '@/features/profile/profileStats';
 import { useProgressStore } from '@/stores/progressStore';
 import {
   border,
@@ -116,11 +117,12 @@ function ProfileSummary() {
 }
 
 function LevelCard({ totalXp }: { totalXp: number }) {
-  const { currentLevelXp, level, progressPercentage, xpToNextLevel } = getLevelProgress(totalXp);
+  const safeTotalXp = Number.isFinite(totalXp) ? Math.max(0, totalXp) : 0;
+  const { currentLevelXp, level, progressPercentage, xpToNextLevel } = getLevelProgress(safeTotalXp);
 
   return (
     <Card
-      accessibilityLabel={`Seviye ${level}, toplam ${totalXp} XP, sonraki seviyeye ${xpToNextLevel} XP`}
+      accessibilityLabel={`Seviye ${level}, toplam ${safeTotalXp} XP, sonraki seviyeye ${xpToNextLevel} XP`}
       style={styles.levelCard}
     >
       <View style={styles.levelTopRow}>
@@ -129,7 +131,7 @@ function LevelCard({ totalXp }: { totalXp: number }) {
           <Typography variant="displayCompact">{level}</Typography>
         </View>
         <View style={styles.xpCopy}>
-          <Typography variant="h3">{totalXp} XP</Typography>
+          <Typography variant="h3">{safeTotalXp} XP</Typography>
           <Typography color="textSecondary" variant="small">
             Bu seviyede {currentLevelXp} / {XP_PER_LEVEL} XP
           </Typography>
@@ -293,6 +295,7 @@ export function ProfileScreen() {
   const projectProgress = useProgressStore((state) => state.projects);
   const lessonProgress = useProgressStore((state) => state.lessons);
   const quizProgress = useProgressStore((state) => state.quizzes);
+  const quizHistory = useProgressStore((state) => state.quizHistory);
   const earnedAchievementIds = useProgressStore((state) => state.earnedAchievementIds);
 
   if (!hasHydrated) return <LoadingProfile />;
@@ -316,6 +319,7 @@ export function ProfileScreen() {
   const completedLessonIds = new Set(
     lessonProgress.filter((item) => item.completedAt).map((item) => item.lessonId),
   );
+  const learningStats = getProfileLearningStats(lessonProgress, quizHistory);
   const completedQuizCount = quizProgress.filter((item) => item.completedAt).length;
   const completedProjectCount = projects.filter(
     (project) => getCompletedStageCount(project) === project.stages.length,
@@ -324,8 +328,11 @@ export function ProfileScreen() {
   const metrics: readonly Metric[] = [
     { label: 'Toplam proje', value: String(projects.length) },
     { label: 'Tamamlanan proje', value: String(completedProjectCount) },
-    { label: 'Tamamlanan ders', value: String(completedLessonIds.size) },
-    { label: 'Tamamlanan quiz', value: String(completedQuizCount) },
+    { label: 'Tamamlanan ders', value: String(learningStats.completedLessonCount) },
+    { label: 'Full quiz denemesi', value: String(learningStats.fullQuizAttemptCount) },
+    ...(learningStats.bestFullQuizScore === undefined
+      ? []
+      : [{ label: 'En iyi full quiz skoru', value: `%${learningStats.bestFullQuizScore}` }]),
     { label: 'Kazanılan başarım', value: `${earnedIds.size} / ${achievements.length}` },
   ];
 
@@ -344,6 +351,14 @@ export function ProfileScreen() {
           title="İlerlemem"
         />
         <MetricsGrid cardWidth={summaryCardWidth} metrics={metrics} />
+        {learningStats.completedLessonCount === 0 && learningStats.fullQuizAttemptCount === 0 ? (
+          <Card accessibilityLabel="Öğrenme ilerlemesi başlangıç durumu" style={styles.emptyCard}>
+            <Typography accessibilityRole="header" variant="h4">İlk adımını at</Typography>
+            <Typography color="textSecondary" style={styles.bodyLine}>
+              Bir ders veya full quiz tamamladığında öğrenme istatistiklerin burada görünecek.
+            </Typography>
+          </Card>
+        ) : null}
         <Card style={styles.domainCard}>
           <DomainProgress completed={completedProjectCount} label="Projeler" total={projects.length} />
           <DomainProgress completed={completedLessonIds.size} label="Dersler" total={lessons.length} />
@@ -480,6 +495,9 @@ const styles = StyleSheet.create({
   },
   domainCard: {
     gap: spacing.lg,
+  },
+  emptyCard: {
+    gap: spacing.xs,
   },
   domainRow: {
     gap: spacing.xs,
