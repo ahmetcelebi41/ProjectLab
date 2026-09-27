@@ -1,6 +1,6 @@
 import type { Href } from 'expo-router';
 import { router } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import { Badge, type BadgeVariant } from '@/components/ui/Badge';
@@ -9,7 +9,7 @@ import { Card } from '@/components/ui/Card';
 import { Progress } from '@/components/ui/Progress';
 import { Screen } from '@/components/ui/Screen';
 import { Typography } from '@/components/ui/Typography';
-import { achievementsById, lessons, projects, quizzes } from '@/data';
+import { achievementsById, lessons, projects } from '@/data';
 import { getLevelProgress } from '@/features/progress/level';
 import { getCompletedProjectStageIds } from '@/features/progress/projectProgress';
 import { useProgressStore } from '@/stores/progressStore';
@@ -23,6 +23,14 @@ import {
   spacing,
 } from '@/theme/tokens';
 import type { Lesson, Project, ProjectStatus } from '@/types';
+
+import {
+  formatActivityTime,
+  getLatestContinueActivity,
+  getLatestLearningSummary,
+  type ContinueActivity,
+  type LearningSummary,
+} from './homeProgress';
 
 const projectStatus: Record<
   ProjectStatus,
@@ -93,17 +101,18 @@ function LoadingHome() {
 }
 
 function LevelSummary({ totalXp }: { totalXp: number }) {
-  const { level, progressPercentage, xpToNextLevel } = getLevelProgress(totalXp);
+  const safeTotalXp = Number.isFinite(totalXp) ? Math.max(0, totalXp) : 0;
+  const { level, progressPercentage, xpToNextLevel } = getLevelProgress(safeTotalXp);
 
   return (
-    <Card accessibilityLabel={`Seviye ${level}, toplam ${totalXp} XP`} style={styles.levelCard}>
+    <Card accessibilityLabel={`Seviye ${level}, toplam ${safeTotalXp} XP`} style={styles.levelCard}>
       <View style={styles.levelTopRow}>
         <View style={styles.levelText}>
           <Typography color="textSecondary" variant="caption">SEVİYE</Typography>
           <Typography variant="h2">{level}</Typography>
         </View>
         <View style={styles.xpText}>
-          <Typography variant="h4">{totalXp} XP</Typography>
+          <Typography variant="h4">{safeTotalXp} XP</Typography>
           <Typography color="textMuted" variant="caption">
             Sonraki seviyeye {xpToNextLevel} XP
           </Typography>
@@ -117,70 +126,21 @@ function LevelSummary({ totalXp }: { totalXp: number }) {
   );
 }
 
-function ContinueCard() {
-  const projectProgress = useProgressStore((state) => state.projects);
-  const lessonProgress = useProgressStore((state) => state.lessons);
-  const quizProgress = useProgressStore((state) => state.quizzes);
-
-  const activity = useMemo(() => {
-    const unfinishedQuiz = quizzes.find((quiz) => {
-      const progress = quizProgress.find((item) => item.quizId === quiz.id);
-      return progress && !progress.completedAt && (progress.answers.length > 0 || progress.currentQuestionIndex > 0);
-    });
-
-    if (unfinishedQuiz) {
-      return {
-        eyebrow: 'Yarım kalan quiz',
-        title: unfinishedQuiz.title,
-        description: unfinishedQuiz.summary,
-        action: 'Quize devam et',
-        href: `/learn/${unfinishedQuiz.lessonId}/quiz/${unfinishedQuiz.id}` as Href,
-      };
-    }
-
-    const unfinishedLesson = lessons.find((lesson) => {
-      const progress = lessonProgress.find((item) => item.lessonId === lesson.id);
-      return progress?.lastBlockId && !progress.completedAt;
-    });
-
-    if (unfinishedLesson) {
-      return {
-        eyebrow: 'Yarım kalan ders',
-        title: unfinishedLesson.title,
-        description: unfinishedLesson.summary,
-        action: 'Derse devam et',
-        href: `/learn/${unfinishedLesson.id}` as Href,
-      };
-    }
-
-    const latestProjectProgress = [...projectProgress]
-      .filter((item) => item.lastVisitedAt)
-      .sort((left, right) =>
-        (right.lastVisitedAt ?? '').localeCompare(left.lastVisitedAt ?? ''),
-      )[0];
-    const latestProject = projects.find((project) => project.id === latestProjectProgress?.projectId);
-    const fallbackProject = projects.find((project) => project.status === 'in-progress') ?? projects[0];
-    const project = latestProject ?? fallbackProject;
-    const activeStageId = project.currentStageId;
-    const activeStage = project.stages.find((stage) => stage.id === activeStageId);
-
-    return {
-      eyebrow: latestProject ? 'Son proje' : 'Önerilen başlangıç',
-      title: project.title,
-      description: activeStage?.summary ?? project.summary,
-      action: latestProject ? 'Projeye devam et' : 'Projeyi keşfet',
-      href: `/projects/${project.id}` as Href,
-    };
-  }, [lessonProgress, projectProgress, quizProgress]);
-
+function ContinueCard({ activity }: { activity: ContinueActivity }) {
+  const occurredAt = activity.occurredAt ? formatActivityTime(activity.occurredAt) : undefined;
   return (
     <Card raised style={styles.continueCard}>
       <View style={styles.cardCopy}>
-        <Typography color="primary" variant="caption">{activity.eyebrow.toUpperCase()}</Typography>
+        <Typography color="primary" variant="caption">
+          {`SON AKTİVİTE · ${activity.typeLabel.toUpperCase()}`}
+        </Typography>
         <Typography accessibilityRole="header" variant="h2">{activity.title}</Typography>
         <Typography color="textSecondary" style={styles.bodyLine} variant="bodyLarge">
           {activity.description}
         </Typography>
+        {occurredAt ? (
+          <Typography color="textMuted" variant="caption">{occurredAt}</Typography>
+        ) : null}
       </View>
       <Button
         accessibilityLabel={`${activity.action}: ${activity.title}`}
@@ -188,6 +148,52 @@ function ContinueCard() {
         size="large"
       >
         {activity.action}
+      </Button>
+    </Card>
+  );
+}
+
+function StartCard() {
+  return (
+    <Card raised style={styles.continueCard}>
+      <View style={styles.cardCopy}>
+        <Typography color="primary" variant="caption">İLK ADIMINI SEÇ</Typography>
+        <Typography accessibilityRole="header" variant="h2">ProjectLab’e başla</Typography>
+        <Typography color="textSecondary" style={styles.bodyLine} variant="bodyLarge">
+          Kısa bir dersle öğrenmeye başla veya projeleri keşfet.
+        </Typography>
+      </View>
+      <View style={styles.startActions}>
+        <Button accessibilityLabel="Öğren sayfasına git" onPress={() => navigate('/learn')}>
+          Öğren’e Git
+        </Button>
+        <Button
+          accessibilityLabel="Projeler sayfasına git"
+          onPress={() => navigate('/projects')}
+          variant="secondary"
+        >
+          Projeleri Keşfet
+        </Button>
+      </View>
+    </Card>
+  );
+}
+
+function LatestLearningCard({ summary }: { summary: LearningSummary }) {
+  return (
+    <Card style={styles.secondaryCard}>
+      <Typography color="primary" variant="caption">{summary.eyebrow}</Typography>
+      <View style={styles.cardCopy}>
+        <Typography accessibilityRole="header" variant="h4">{summary.title}</Typography>
+        <Typography color="textSecondary" style={styles.bodyLine}>
+          {summary.description}
+        </Typography>
+        <Typography color="textMuted" variant="caption">
+          {formatActivityTime(summary.occurredAt)}
+        </Typography>
+      </View>
+      <Button accessibilityLabel="Öğrenme ilerlemesini aç" onPress={() => navigate('/learn')} variant="ghost">
+        Öğrenme İlerlemesi
       </Button>
     </Card>
   );
@@ -332,6 +338,9 @@ export function HomeScreen() {
   const hasHydrated = useProgressStore((state) => state.hasHydrated);
   const totalXp = useProgressStore((state) => state.totalXp);
   const lessonProgress = useProgressStore((state) => state.lessons);
+  const projectProgress = useProgressStore((state) => state.projects);
+  const quizHistory = useProgressStore((state) => state.quizHistory);
+  const lastActivity = useProgressStore((state) => state.lastActivity);
 
   const horizontalPadding = width >= breakpoints.medium
     ? layout.horizontalPadding.wide.min
@@ -350,6 +359,8 @@ export function HomeScreen() {
   const todayLesson = lessons.find(
     (lesson) => !lessonProgress.find((item) => item.lessonId === lesson.id)?.completedAt,
   ) ?? lessons[0];
+  const continueActivity = getLatestContinueActivity(lastActivity, projectProgress);
+  const latestLearning = getLatestLearningSummary(lessonProgress, quizHistory);
 
   if (!hasHydrated) return <LoadingHome />;
 
@@ -382,10 +393,12 @@ export function HomeScreen() {
 
       <LevelSummary totalXp={totalXp} />
 
-      <View style={styles.section}>
-        <SectionHeading title="Devam Et" />
-        <ContinueCard />
-      </View>
+      {continueActivity || (lastActivity === null && projectProgress.length === 0) ? (
+        <View style={styles.section}>
+          <SectionHeading title="Kaldığın Yerden Devam Et" />
+          {continueActivity ? <ContinueCard activity={continueActivity} /> : <StartCard />}
+        </View>
+      ) : null}
 
       <View style={styles.section}>
         <SectionHeading title="Projelerim" actionLabel="Tümünü Gör" href="/projects" />
@@ -402,6 +415,11 @@ export function HomeScreen() {
       </View>
 
       <View style={styles.grid}>
+        {latestLearning ? (
+          <View style={{ width: secondaryCardWidth }}>
+            <LatestLearningCard summary={latestLearning} />
+          </View>
+        ) : null}
         <View style={{ width: secondaryCardWidth }}>
           <DailyTask lesson={todayLesson} />
         </View>
@@ -452,6 +470,8 @@ const styles = StyleSheet.create({
   levelTopRow: {
     alignItems: 'center',
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
     justifyContent: 'space-between',
   },
   levelText: {
@@ -459,6 +479,7 @@ const styles = StyleSheet.create({
   },
   xpText: {
     alignItems: 'flex-end',
+    flexShrink: 1,
     gap: spacing.xxs,
   },
   section: {
@@ -473,6 +494,11 @@ const styles = StyleSheet.create({
   continueCard: {
     gap: spacing.xl,
     padding: spacing.xl,
+  },
+  startActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
   },
   cardCopy: {
     gap: spacing.xs,

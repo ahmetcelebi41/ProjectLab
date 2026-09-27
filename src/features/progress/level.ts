@@ -8,7 +8,7 @@ export type LevelProgress = Readonly<{
 }>;
 
 export function getLevelProgress(totalXp: number): LevelProgress {
-  const normalizedXp = Math.max(0, totalXp);
+  const normalizedXp = Number.isFinite(totalXp) ? Math.max(0, totalXp) : 0;
   const currentLevelXp = normalizedXp % XP_PER_LEVEL;
 
   return {
