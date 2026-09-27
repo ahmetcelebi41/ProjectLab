@@ -206,7 +206,9 @@ export function QuizResultScreen({ lessonId, quizId }: Props) {
         <View style={styles.copy}>
           <Typography accessibilityRole="header" variant="h3">Sıradaki adım</Typography>
           <Typography color="textSecondary" style={styles.bodyLine}>
-            Dersi yeniden inceleyebilir, Öğren’e dönebilir veya quizi tekrar çözebilirsin.
+            {incorrectQuestions.length
+              ? 'Yanlışlarını tekrar edebilir, dersi yeniden inceleyebilir veya Öğren’e dönebilirsin.'
+              : 'Tüm soruları doğru yanıtladın. Öğren’e dönerek sıradaki konuya geçebilirsin.'}
           </Typography>
         </View>
         <View style={styles.actionRow}>
@@ -225,7 +227,7 @@ export function QuizResultScreen({ lessonId, quizId }: Props) {
             onPress={() => router.replace(quizPath as Href)}
             size="large"
             style={styles.actionButton}
-            variant={incorrectQuestions.length ? 'secondary' : 'primary'}
+            variant="secondary"
           >
             Quizi Tekrar Çöz
           </Button>
@@ -241,7 +243,7 @@ export function QuizResultScreen({ lessonId, quizId }: Props) {
             onPress={() => router.replace('/learn')}
             size="large"
             style={styles.actionButton}
-            variant="ghost"
+            variant={incorrectQuestions.length ? 'ghost' : 'primary'}
           >
             Öğren’e Dön
           </Button>

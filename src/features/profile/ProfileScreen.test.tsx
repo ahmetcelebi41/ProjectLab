@@ -41,6 +41,33 @@ describe('ProfileScreen V1.1 progress visibility', () => {
     expect(screen.getByText('Bu seviyede 0 / 10 XP')).toBeTruthy();
   });
 
+  it('explains missing quiz history when lesson progress already exists', () => {
+    setProgress({
+      lessons: [{ lessonId: 'design-tokens', completedAt: '2026-09-27T10:00:00.000Z' }],
+    });
+    const screen = render(<ProfileScreen />);
+
+    expect(screen.getByText('Henüz quiz denemesi yok')).toBeTruthy();
+    expect(screen.queryByText('İlk adımını at')).toBeNull();
+  });
+
+  it('explains missing completed lessons when quiz history already exists', () => {
+    setProgress({
+      quizHistory: [{
+        quizId: 'design-tokens-quiz',
+        attemptType: 'full',
+        completedAt: '2026-09-27T10:00:00.000Z',
+        correctAnswerCount: 3,
+        questionCount: 3,
+        wrongQuestionIds: [],
+      }],
+    });
+    const screen = render(<ProfileScreen />);
+
+    expect(screen.getByText('Henüz tamamlanan ders yok')).toBeTruthy();
+    expect(screen.queryByText('İlk adımını at')).toBeNull();
+  });
+
   it.each([Number.NaN, Number.POSITIVE_INFINITY, -10])(
     'normalizes invalid total XP value %p in the UI',
     (totalXp) => {

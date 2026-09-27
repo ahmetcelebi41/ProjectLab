@@ -306,7 +306,9 @@ export function ProfileScreen() {
   const contentWidth = Math.min(width - horizontalPadding * 2, layout.contentMaxWidth);
   const summaryColumns = width >= breakpoints.expanded
     ? layout.columns.wide.max
-    : layout.columns.wide.min;
+    : width >= breakpoints.compact
+      ? layout.columns.wide.min
+      : layout.columns.mobile;
   const contentColumns = width >= breakpoints.medium ? layout.columns.wide.min : layout.columns.mobile;
   const achievementColumns = width >= breakpoints.expanded
     ? layout.columns.wide.max
@@ -356,6 +358,20 @@ export function ProfileScreen() {
             <Typography accessibilityRole="header" variant="h4">İlk adımını at</Typography>
             <Typography color="textSecondary" style={styles.bodyLine}>
               Bir ders veya full quiz tamamladığında öğrenme istatistiklerin burada görünecek.
+            </Typography>
+          </Card>
+        ) : learningStats.fullQuizAttemptCount === 0 ? (
+          <Card accessibilityLabel="Henüz tamamlanan full quiz yok" style={styles.emptyCard}>
+            <Typography accessibilityRole="header" variant="h4">Henüz quiz denemesi yok</Typography>
+            <Typography color="textSecondary" style={styles.bodyLine}>
+              Bir full quiz tamamladığında deneme sayın ve en iyi skorun burada görünecek.
+            </Typography>
+          </Card>
+        ) : learningStats.completedLessonCount === 0 ? (
+          <Card accessibilityLabel="Henüz tamamlanan ders yok" style={styles.emptyCard}>
+            <Typography accessibilityRole="header" variant="h4">Henüz tamamlanan ders yok</Typography>
+            <Typography color="textSecondary" style={styles.bodyLine}>
+              İlk dersini tamamladığında konu ilerlemen burada görünmeye başlayacak.
             </Typography>
           </Card>
         ) : null}
@@ -477,6 +493,8 @@ const styles = StyleSheet.create({
   levelTopRow: {
     alignItems: 'center',
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
     justifyContent: 'space-between',
   },
   levelBadge: {
@@ -484,6 +502,7 @@ const styles = StyleSheet.create({
   },
   xpCopy: {
     alignItems: 'flex-end',
+    flexShrink: 1,
     gap: spacing.xxs,
   },
   progressBlock: {
@@ -505,6 +524,7 @@ const styles = StyleSheet.create({
   metaRow: {
     alignItems: 'center',
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: spacing.sm,
     justifyContent: 'space-between',
   },

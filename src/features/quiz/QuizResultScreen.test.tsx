@@ -106,9 +106,12 @@ describe('QuizResultScreen attempt details', () => {
     );
 
     expect(screen.getByText('Mükemmel sonuç')).toBeTruthy();
+    expect(screen.getByText('Tüm soruları doğru yanıtladın. Öğren’e dönerek sıradaki konuya geçebilirsin.')).toBeTruthy();
     expect(screen.getByLabelText('Yüzde 100')).toBeTruthy();
     expect(screen.getByText('+40')).toBeTruthy();
     expect(screen.queryByText('Yanlışları Tekrarla')).toBeNull();
+    fireEvent.press(screen.getByText('Öğren’e Dön'));
+    expect(mockRouterReplace).toHaveBeenCalledWith('/learn');
     designTokensQuiz.questions.forEach((_, index) => {
       expect(screen.getByLabelText(`Soru ${index + 1}, doğru`)).toBeTruthy();
     });

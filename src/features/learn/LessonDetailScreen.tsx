@@ -202,7 +202,7 @@ function LessonActions({ completed, lesson }: { completed: boolean; lesson: Less
   };
 
   return (
-    <Card raised style={styles.actionCard}>
+    <Card accessibilityLiveRegion="polite" raised style={styles.actionCard}>
       <View style={styles.sectionCopy}>
         <Typography color={completed ? 'success' : 'primary'} variant="caption">
           {completed ? 'DERS TAMAMLANDI' : 'DERSİ BİTİR'}
@@ -212,7 +212,7 @@ function LessonActions({ completed, lesson }: { completed: boolean; lesson: Less
         </Typography>
         <Typography color="textSecondary" style={styles.bodyLine}>
           {completed
-            ? 'Dersi istediğin zaman yeniden inceleyebilirsin.'
+            ? `+${lesson.completionXp} XP kazandın. Dersi istediğin zaman yeniden inceleyebilirsin.`
             : `Tamamladığında ${lesson.completionXp} XP kazanırsın.`}
         </Typography>
       </View>

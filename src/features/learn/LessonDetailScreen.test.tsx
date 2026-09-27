@@ -48,6 +48,7 @@ describe('LessonDetailScreen progress integration', () => {
     fireEvent.press(screen.getByText('Dersi Tamamla'));
 
     await waitFor(() => expect(screen.getByText('Harika, bu dersi tamamladın.')).toBeTruthy());
+    expect(screen.getByText(`+${lessonsById['design-tokens'].completionXp} XP kazandın. Dersi istediğin zaman yeniden inceleyebilirsin.`)).toBeTruthy();
     const stateAfterFirstCompletion = useProgressStore.getState();
     expect(stateAfterFirstCompletion.totalXp).toBe(lessonsById['design-tokens'].completionXp);
     expect(stateAfterFirstCompletion.lessons[0]?.completedAt).toBe(lessonCompletedAt);
