@@ -34,7 +34,7 @@ describe('ProfileScreen V1.2 learning stats', () => {
     expect(screen.getByText('Öğrenme Özeti')).toBeTruthy();
     expect(screen.getByLabelText('Ders ilerlemesi yüzde 0')).toBeTruthy();
     expect(screen.getByLabelText('Quiz ilerlemesi yüzde 0')).toBeTruthy();
-    expect(screen.getAllByText('Veri yetersiz')).toHaveLength(2);
+    expect(screen.getByText('Veri yetersiz')).toBeTruthy();
     expect(screen.getByText('Henüz quiz performans verisi yok.')).toBeTruthy();
     expect(screen.getByText('Henüz aktivite yok.')).toBeTruthy();
     expect(screen.queryByText(/NaN|Infinity/)).toBeNull();
@@ -72,6 +72,7 @@ describe('ProfileScreen V1.2 learning stats', () => {
 
     expect(screen.getByLabelText('Ders ilerlemesi yüzde 33')).toBeTruthy();
     expect(screen.getByLabelText('Quiz ilerlemesi yüzde 33')).toBeTruthy();
+    expect(screen.getAllByText('1 / 3 · %33').length).toBeGreaterThanOrEqual(2);
     expect(screen.getByLabelText('Genel doğruluk: %80')).toBeTruthy();
     expect(screen.getByLabelText('Full attempt: 1')).toBeTruthy();
     expect(screen.getByLabelText('Retry attempt: 1')).toBeTruthy();
@@ -116,11 +117,11 @@ describe('ProfileScreen V1.2 learning stats', () => {
     const screen = render(<ProfileScreen />);
 
     expect(screen.getByLabelText('Geçmiş quiz verisi eksik')).toBeTruthy();
-    expect(screen.getByLabelText('Kayıtlı genel doğruluk: %100')).toBeTruthy();
-    expect(screen.getByLabelText('Kayıtlı full attempt: 0')).toBeTruthy();
-    expect(screen.getByLabelText('Kayıtlı retry attempt: 1')).toBeTruthy();
-    expect(screen.getByLabelText('Kayıtlı toplam attempt: 1')).toBeTruthy();
-    expect(screen.queryByLabelText('Toplam attempt: 1')).toBeNull();
+    expect(screen.getByLabelText('Genel doğruluk: Veri yetersiz')).toBeTruthy();
+    expect(screen.getByLabelText('Full attempt: 0')).toBeTruthy();
+    expect(screen.getByLabelText('Retry attempt: 1')).toBeTruthy();
+    expect(screen.getByLabelText('Toplam attempt: 1')).toBeTruthy();
+    expect(screen.queryByLabelText('Genel doğruluk: %100')).toBeNull();
   });
 
   it('shows the selector-chosen latest activity with type and date', () => {

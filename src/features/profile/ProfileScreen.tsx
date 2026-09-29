@@ -20,6 +20,7 @@ import {
   getCategoryProgress,
   getLearningStats,
   getQuizStats,
+  type LearningStats,
   type LatestActivity,
   type QuizStats,
 } from '@/features/progress/learningStats';
@@ -180,13 +181,12 @@ function MetricsGrid({
   );
 }
 
-function DomainProgress({ completed, label, total }: {
+function DomainProgress({ completed, label, percentage, total }: {
   completed: number;
   label: string;
+  percentage: number;
   total: number;
 }) {
-  const percentage = getPercentage(completed, total);
-
   return (
     <View style={styles.domainRow}>
       <View style={styles.metaRow}>
@@ -200,37 +200,22 @@ function DomainProgress({ completed, label, total }: {
   );
 }
 
-function LearningSummary({
-  completedLessons,
-  completedQuizzes,
-  lessonCompletionRate,
-  quizAccuracy,
-  quizCompletionRate,
-  totalLessons,
-  totalQuizzes,
-}: {
-  completedLessons: number;
-  completedQuizzes: number;
-  lessonCompletionRate: number;
-  quizAccuracy: number | null;
-  quizCompletionRate: number;
-  totalLessons: number;
-  totalQuizzes: number;
-}) {
+function LearningSummary({ stats, width }: { stats: LearningStats; width: number }) {
   return (
-    <Card style={styles.statsCard}>
+    <Card style={[styles.statsCard, { width }]}>
       <Typography accessibilityRole="header" variant="h4">Öğrenme Özeti</Typography>
-      <DomainProgress completed={completedLessons} label="Ders ilerlemesi" total={totalLessons} />
-      <DomainProgress completed={completedQuizzes} label="Quiz ilerlemesi" total={totalQuizzes} />
-      <View style={styles.metaRow}>
-        <Typography variant="button">Genel doğruluk</Typography>
-        <Typography color={quizAccuracy === null ? 'textMuted' : 'text'} variant="h4">
-          {quizAccuracy === null ? 'Veri yetersiz' : `%${quizAccuracy}`}
-        </Typography>
-      </View>
-      <Typography color="textMuted" variant="caption">
-        Ders %{lessonCompletionRate} · Quiz %{quizCompletionRate}
-      </Typography>
+      <DomainProgress
+        completed={stats.completedLessons}
+        label="Ders ilerlemesi"
+        percentage={stats.lessonCompletionPercent}
+        total={stats.totalLessons}
+      />
+      <DomainProgress
+        completed={stats.completedQuizzes}
+        label="Quiz ilerlemesi"
+        percentage={stats.quizCompletionPercent}
+        total={stats.totalQuizzes}
+      />
     </Card>
   );
 }
@@ -244,8 +229,9 @@ function CategoryProgressCard({ categories }: {
       {categories.map((category) => (
         <DomainProgress
           completed={category.completedLessons}
-          key={category.category}
-          label={category.label}
+          key={category.id}
+          label={category.name}
+          percentage={category.completionPercent}
           total={category.totalLessons}
         />
       ))}
@@ -253,27 +239,38 @@ function CategoryProgressCard({ categories }: {
   );
 }
 
-function QuizPerformance({ stats }: { stats: QuizStats }) {
-  const isIncomplete = stats.historyStatus === 'incomplete-history';
+function QuizPerformance({
+  learningStats,
+  metricWidth,
+  quizStats,
+  width,
+}: {
+  learningStats: LearningStats;
+  metricWidth: number;
+  quizStats: QuizStats;
+  width: number;
+}) {
+  const isIncomplete = quizStats.historyStatus === 'incomplete-history';
+  const quizAccuracy = quizStats.hasSufficientData ? quizStats.quizAccuracy : null;
   const metrics: readonly Metric[] = [
     {
-      label: isIncomplete ? 'Kayıtlı genel doğruluk' : 'Genel doğruluk',
-      value: stats.quizAccuracy === null ? 'Veri yetersiz' : `%${stats.quizAccuracy}`,
+      label: 'Genel doğruluk',
+      value: quizAccuracy === null ? 'Veri yetersiz' : `%${quizAccuracy}`,
     },
-    { label: isIncomplete ? 'Kayıtlı full attempt' : 'Full attempt', value: String(stats.fullAttempts) },
-    { label: isIncomplete ? 'Kayıtlı retry attempt' : 'Retry attempt', value: String(stats.retryAttempts) },
-    { label: isIncomplete ? 'Kayıtlı toplam attempt' : 'Toplam attempt', value: String(stats.quizAttempts) },
+    { label: 'Full attempt', value: String(learningStats.fullAttempts) },
+    { label: 'Retry attempt', value: String(learningStats.retryAttempts) },
+    { label: 'Toplam attempt', value: String(learningStats.totalQuizAttempts) },
   ];
 
   return (
-    <Card style={styles.statsCard}>
+    <Card style={[styles.statsCard, { width }]}>
       <Typography accessibilityRole="header" variant="h4">Quiz Performansı</Typography>
-      <MetricsGrid cardWidth="100%" metrics={metrics} />
+      <MetricsGrid cardWidth={metricWidth} metrics={metrics} />
       {isIncomplete ? (
         <Typography accessibilityLabel="Geçmiş quiz verisi eksik" color="textMuted" variant="small">
-          Geçmiş quiz verisi eksik. Yalnızca kayıtlı denemeler gösteriliyor.
+          Geçmiş quiz verisi eksik. Kayıtlı denemeler gösteriliyor; doğruluk için yeterli veri yok.
         </Typography>
-      ) : stats.historyStatus === 'no-data' ? (
+      ) : quizStats.historyStatus === 'no-data' ? (
         <Typography color="textMuted" variant="small">Henüz quiz performans verisi yok.</Typography>
       ) : null}
     </Card>
@@ -430,6 +427,7 @@ export function ProfileScreen() {
     : contentColumns;
   const summaryCardWidth = (contentWidth - spacing.md * (summaryColumns - 1)) / summaryColumns;
   const contentCardWidth = (contentWidth - spacing.md * (contentColumns - 1)) / contentColumns;
+  const quizMetricWidth = (contentCardWidth - spacing.md * 3) / layout.columns.wide.min;
   const achievementCardWidth =
     (contentWidth - spacing.md * (achievementColumns - 1)) / achievementColumns;
 
@@ -469,20 +467,24 @@ export function ProfileScreen() {
           title="İlerlemem"
         />
         <MetricsGrid cardWidth={summaryCardWidth} metrics={metrics} />
-        <LearningSummary
-          completedLessons={learningStats.completedLessons}
-          completedQuizzes={learningStats.completedQuizzes}
-          lessonCompletionRate={learningStats.lessonCompletionRate}
-          quizAccuracy={quizStats.quizAccuracy}
-          quizCompletionRate={learningStats.quizCompletionRate}
-          totalLessons={learningStats.totalLessons}
-          totalQuizzes={learningStats.totalQuizzes}
-        />
+        <View style={styles.grid}>
+          <LearningSummary stats={learningStats} width={contentCardWidth} />
+          <QuizPerformance
+            learningStats={learningStats}
+            metricWidth={quizMetricWidth}
+            quizStats={quizStats}
+            width={contentCardWidth}
+          />
+        </View>
         <CategoryProgressCard categories={categoryProgress} />
-        <QuizPerformance stats={quizStats} />
         <LastActivityCard activity={learningStats.lastActivity} />
         <Card style={styles.domainCard}>
-          <DomainProgress completed={completedProjectCount} label="Projeler" total={projects.length} />
+          <DomainProgress
+            completed={completedProjectCount}
+            label="Projeler"
+            percentage={getPercentage(completedProjectCount, projects.length)}
+            total={projects.length}
+          />
         </Card>
         <View style={styles.grid}>
           {projects.map((project) => (
