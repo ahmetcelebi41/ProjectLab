@@ -468,10 +468,14 @@ const styles = StyleSheet.create({
   header: {
     alignItems: 'center',
     flexDirection: 'row',
+    gap: spacing.md,
     justifyContent: 'space-between',
+    paddingRight: spacing.sm,
   },
   headerCopy: {
+    flexShrink: 1,
     gap: spacing.xxs,
+    minWidth: 0,
   },
   avatar: {
     alignItems: 'center',
@@ -479,6 +483,7 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
     borderWidth: border.width,
     borderRadius: radius.pill,
+    flexShrink: 0,
     height: sizing.button.large,
     justifyContent: 'center',
     width: sizing.button.large,
