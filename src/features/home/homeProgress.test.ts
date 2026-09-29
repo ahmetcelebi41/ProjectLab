@@ -1,10 +1,16 @@
 import {
+  formatActivityTime,
   getContinueActivity,
   getLatestContinueActivity,
   getLatestLearningSummary,
 } from './homeProgress';
 
 describe('home progress presentation', () => {
+  it('formats valid activity dates and safely omits invalid dates', () => {
+    expect(formatActivityTime('2026-09-27T10:00:00.000Z')).toBeTruthy();
+    expect(formatActivityTime('invalid')).toBeUndefined();
+  });
+
   it.each([
     [
       { type: 'lesson', lessonId: 'design-tokens', occurredAt: '2026-09-27T10:00:00.000Z' },

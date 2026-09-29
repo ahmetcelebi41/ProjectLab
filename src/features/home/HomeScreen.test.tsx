@@ -26,7 +26,7 @@ function setProgress(overrides: Partial<ReturnType<typeof useProgressStore.getSt
   });
 }
 
-describe('HomeScreen V1.1 progress integration', () => {
+describe('HomeScreen V1.2 progress integration', () => {
   beforeEach(() => {
     mockRouterPush.mockClear();
     setProgress();
@@ -35,6 +35,8 @@ describe('HomeScreen V1.1 progress integration', () => {
   it('shows a useful empty state for a new user', () => {
     const screen = render(<HomeScreen />);
 
+    expect(screen.getByLabelText('Öğrenme özeti: 0/3 ders, yüzde 0, 0 XP, seviye 1')).toBeTruthy();
+    expect(screen.getByLabelText('Ders ilerlemesi yüzde 0')).toBeTruthy();
     expect(screen.getByText('ProjectLab’e başla')).toBeTruthy();
     fireEvent.press(screen.getByLabelText('Öğren sayfasına git'));
     expect(mockRouterPush).toHaveBeenCalledWith('/learn');
@@ -61,6 +63,7 @@ describe('HomeScreen V1.1 progress integration', () => {
     const screen = render(<HomeScreen />);
 
     expect(screen.getAllByText(title).length).toBeGreaterThan(0);
+    expect(screen.getByText(`SON AKTİVİTE · ${activity.type.toUpperCase() === 'LESSON' ? 'DERS' : 'QUIZ'}`)).toBeTruthy();
     expect(screen.queryByText('design-tokens')).toBeNull();
     expect(screen.queryByText('/learn/design-tokens')).toBeNull();
     fireEvent.press(screen.getByText(action));
@@ -79,11 +82,12 @@ describe('HomeScreen V1.1 progress integration', () => {
     const screen = render(<HomeScreen />);
 
     expect(screen.getAllByText('NOVA').length).toBeGreaterThan(0);
+    expect(screen.getByText('SON AKTİVİTE · PROJE')).toBeTruthy();
     fireEvent.press(screen.getByText('Projeye devam et'));
     expect(mockRouterPush).toHaveBeenCalledWith('/projects/nova');
   });
 
-  it('hides a continuation card for an invalid activity target', () => {
+  it('falls back to the existing start action for an invalid activity target', () => {
     setProgress({
       lastActivity: {
         type: 'lesson',
@@ -93,16 +97,48 @@ describe('HomeScreen V1.1 progress integration', () => {
     });
     const screen = render(<HomeScreen />);
 
-    expect(screen.queryByText('Kaldığın Yerden Devam Et')).toBeNull();
+    expect(screen.getByText('Kaldığın Yerden Devam Et')).toBeTruthy();
+    expect(screen.getByText('ProjectLab’e başla')).toBeTruthy();
     expect(screen.queryByText('internal-route')).toBeNull();
   });
 
-  it('derives level progress at an exact level boundary', () => {
-    setProgress({ totalXp: 10 });
+  it('shows lesson completion, percentage, XP and level from learning stats', () => {
+    setProgress({
+      totalXp: 20,
+      lessons: [{ lessonId: 'design-tokens', completedAt: '2026-09-27T10:00:00.000Z' }],
+    });
     const screen = render(<HomeScreen />);
 
-    expect(screen.getByLabelText('Seviye 2, toplam 10 XP')).toBeTruthy();
-    expect(screen.getByLabelText('Seviye 2 ilerlemesi yüzde 0')).toBeTruthy();
-    expect(screen.getByText('Sonraki seviyeye 10 XP')).toBeTruthy();
+    expect(screen.getByLabelText('Öğrenme özeti: 1/3 ders, yüzde 33, 20 XP, seviye 3')).toBeTruthy();
+    expect(screen.getByLabelText('Ders ilerlemesi yüzde 33')).toBeTruthy();
+    expect(screen.getByText('1/3')).toBeTruthy();
+    expect(screen.getByText('%33')).toBeTruthy();
+  });
+
+  it('falls back from an invalid learning date to a valid project visit', () => {
+    setProgress({
+      lastActivity: {
+        type: 'quiz',
+        quizId: 'design-tokens-quiz',
+        occurredAt: 'not-a-date',
+      },
+      projects: [{ projectId: 'elora', lastVisitedAt: '2026-09-27T10:00:00.000Z' }],
+    });
+    const screen = render(<HomeScreen />);
+
+    expect(screen.getByText('SON AKTİVİTE · PROJE')).toBeTruthy();
+    expect(screen.getAllByText('ELORA').length).toBeGreaterThan(0);
+    fireEvent.press(screen.getByText('Projeye devam et'));
+    expect(mockRouterPush).toHaveBeenCalledWith('/projects/elora');
+  });
+
+  it('keeps existing project cards and their navigation', () => {
+    const screen = render(<HomeScreen />);
+
+    expect(screen.getByText('Projelerim')).toBeTruthy();
+    expect(screen.getAllByText('NOVA').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Tamamlandı').length).toBeGreaterThan(0);
+    fireEvent.press(screen.getByLabelText('NOVA projesini aç'));
+    expect(mockRouterPush).toHaveBeenCalledWith('/projects/nova');
   });
 });

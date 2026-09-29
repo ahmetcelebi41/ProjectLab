@@ -1,6 +1,6 @@
 import type { Href } from 'expo-router';
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import { Badge, type BadgeVariant } from '@/components/ui/Badge';
@@ -10,7 +10,10 @@ import { Progress } from '@/components/ui/Progress';
 import { Screen } from '@/components/ui/Screen';
 import { Typography } from '@/components/ui/Typography';
 import { achievementsById, lessons, projects } from '@/data';
-import { getLevelProgress } from '@/features/progress/level';
+import {
+  getLearningStats,
+  type LearningStats,
+} from '@/features/progress/learningStats';
 import { getCompletedProjectStageIds } from '@/features/progress/projectProgress';
 import { useProgressStore } from '@/stores/progressStore';
 import {
@@ -26,7 +29,7 @@ import type { Lesson, Project, ProjectStatus } from '@/types';
 
 import {
   formatActivityTime,
-  getLatestContinueActivity,
+  getContinueActivity,
   getLatestLearningSummary,
   type ContinueActivity,
   type LearningSummary,
@@ -100,27 +103,35 @@ function LoadingHome() {
   );
 }
 
-function LevelSummary({ totalXp }: { totalXp: number }) {
-  const safeTotalXp = Number.isFinite(totalXp) ? Math.max(0, totalXp) : 0;
-  const { level, progressPercentage, xpToNextLevel } = getLevelProgress(safeTotalXp);
-
+function LearningOverview({ stats }: { stats: LearningStats }) {
   return (
-    <Card accessibilityLabel={`Seviye ${level}, toplam ${safeTotalXp} XP`} style={styles.levelCard}>
-      <View style={styles.levelTopRow}>
-        <View style={styles.levelText}>
-          <Typography color="textSecondary" variant="caption">SEVİYE</Typography>
-          <Typography variant="h2">{level}</Typography>
-        </View>
-        <View style={styles.xpText}>
-          <Typography variant="h4">{safeTotalXp} XP</Typography>
-          <Typography color="textMuted" variant="caption">
-            Sonraki seviyeye {xpToNextLevel} XP
+    <Card
+      accessibilityLabel={`Öğrenme özeti: ${stats.completedLessons}/${stats.totalLessons} ders, yüzde ${stats.lessonCompletionRate}, ${stats.xp} XP, seviye ${stats.level}`}
+      style={styles.overviewCard}
+    >
+      <View style={styles.overviewTopRow}>
+        <View style={styles.overviewItem}>
+          <Typography color="textSecondary" variant="caption">DERSLER</Typography>
+          <Typography variant="h3">
+            {stats.completedLessons}/{stats.totalLessons}
           </Typography>
+        </View>
+        <View style={styles.overviewItem}>
+          <Typography color="textSecondary" variant="caption">İLERLEME</Typography>
+          <Typography variant="h3">%{stats.lessonCompletionRate}</Typography>
+        </View>
+        <View style={styles.overviewItem}>
+          <Typography color="textSecondary" variant="caption">XP</Typography>
+          <Typography variant="h3">{stats.xp}</Typography>
+        </View>
+        <View style={styles.overviewItem}>
+          <Typography color="textSecondary" variant="caption">SEVİYE</Typography>
+          <Typography variant="h3">{stats.level}</Typography>
         </View>
       </View>
       <Progress
-        accessibilityLabel={`Seviye ${level} ilerlemesi yüzde ${progressPercentage}`}
-        value={progressPercentage}
+        accessibilityLabel={`Ders ilerlemesi yüzde ${stats.lessonCompletionRate}`}
+        value={stats.lessonCompletionRate}
       />
     </Card>
   );
@@ -339,6 +350,7 @@ export function HomeScreen() {
   const totalXp = useProgressStore((state) => state.totalXp);
   const lessonProgress = useProgressStore((state) => state.lessons);
   const projectProgress = useProgressStore((state) => state.projects);
+  const quizProgress = useProgressStore((state) => state.quizzes);
   const quizHistory = useProgressStore((state) => state.quizHistory);
   const lastActivity = useProgressStore((state) => state.lastActivity);
 
@@ -359,7 +371,16 @@ export function HomeScreen() {
   const todayLesson = lessons.find(
     (lesson) => !lessonProgress.find((item) => item.lessonId === lesson.id)?.completedAt,
   ) ?? lessons[0];
-  const continueActivity = getLatestContinueActivity(lastActivity, projectProgress);
+  const progressSource = useMemo(() => ({
+    lastActivity,
+    lessons: lessonProgress,
+    projects: projectProgress,
+    quizHistory,
+    quizzes: quizProgress,
+    totalXp,
+  }), [lastActivity, lessonProgress, projectProgress, quizHistory, quizProgress, totalXp]);
+  const learningStats = useMemo(() => getLearningStats(progressSource), [progressSource]);
+  const continueActivity = getContinueActivity(learningStats.lastActivity);
   const latestLearning = getLatestLearningSummary(lessonProgress, quizHistory);
 
   if (!hasHydrated) return <LoadingHome />;
@@ -391,14 +412,15 @@ export function HomeScreen() {
         </Pressable>
       </View>
 
-      <LevelSummary totalXp={totalXp} />
+      <View style={styles.section}>
+        <SectionHeading title="Öğrenme Özeti" />
+        <LearningOverview stats={learningStats} />
+      </View>
 
-      {continueActivity || (lastActivity === null && projectProgress.length === 0) ? (
-        <View style={styles.section}>
-          <SectionHeading title="Kaldığın Yerden Devam Et" />
-          {continueActivity ? <ContinueCard activity={continueActivity} /> : <StartCard />}
-        </View>
-      ) : null}
+      <View style={styles.section}>
+        <SectionHeading title="Kaldığın Yerden Devam Et" />
+        {continueActivity ? <ContinueCard activity={continueActivity} /> : <StartCard />}
+      </View>
 
       <View style={styles.section}>
         <SectionHeading title="Projelerim" actionLabel="Tümünü Gör" href="/projects" />
@@ -464,23 +486,20 @@ const styles = StyleSheet.create({
   avatarPressed: {
     borderColor: colors.onPrimary,
   },
-  levelCard: {
+  overviewCard: {
     gap: spacing.md,
   },
-  levelTopRow: {
-    alignItems: 'center',
+  overviewTopRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: spacing.sm,
+    gap: spacing.lg,
     justifyContent: 'space-between',
   },
-  levelText: {
+  overviewItem: {
+    flexBasis: '20%',
+    flexGrow: 1,
     gap: spacing.xxs,
-  },
-  xpText: {
-    alignItems: 'flex-end',
-    flexShrink: 1,
-    gap: spacing.xxs,
+    minWidth: sizing.button.large,
   },
   section: {
     gap: spacing.md,
