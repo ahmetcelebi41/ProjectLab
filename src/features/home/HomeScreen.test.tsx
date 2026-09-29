@@ -35,8 +35,11 @@ describe('HomeScreen V1.2 progress integration', () => {
   it('shows a useful empty state for a new user', () => {
     const screen = render(<HomeScreen />);
 
-    expect(screen.getByLabelText('Öğrenme özeti: 0/3 ders, yüzde 0, 0 XP, seviye 1')).toBeTruthy();
+    expect(screen.getByLabelText('Öğrenme özeti: 0/3 ders, yüzde 0; 0/3 quiz, yüzde 0')).toBeTruthy();
     expect(screen.getByLabelText('Ders ilerlemesi yüzde 0')).toBeTruthy();
+    expect(screen.getByLabelText('Quiz ilerlemesi yüzde 0')).toBeTruthy();
+    expect(screen.getAllByLabelText(/^Ana öneri:/)).toHaveLength(1);
+    expect(screen.getByLabelText('Ana öneri: ProjectLab’e başla')).toBeTruthy();
     expect(screen.getByText('ProjectLab’e başla')).toBeTruthy();
     fireEvent.press(screen.getByLabelText('Öğren sayfasına git'));
     expect(mockRouterPush).toHaveBeenCalledWith('/learn');
@@ -64,6 +67,7 @@ describe('HomeScreen V1.2 progress integration', () => {
 
     expect(screen.getAllByText(title).length).toBeGreaterThan(0);
     expect(screen.getByText(`SON AKTİVİTE · ${activity.type.toUpperCase() === 'LESSON' ? 'DERS' : 'QUIZ'}`)).toBeTruthy();
+    expect(screen.getAllByLabelText(/^Ana öneri:/)).toHaveLength(1);
     expect(screen.queryByText('design-tokens')).toBeNull();
     expect(screen.queryByText('/learn/design-tokens')).toBeNull();
     fireEvent.press(screen.getByText(action));
@@ -83,6 +87,8 @@ describe('HomeScreen V1.2 progress integration', () => {
 
     expect(screen.getAllByText('NOVA').length).toBeGreaterThan(0);
     expect(screen.getByText('SON AKTİVİTE · PROJE')).toBeTruthy();
+    expect(screen.getAllByLabelText(/^Ana öneri:/)).toHaveLength(1);
+    expect(screen.getByLabelText('Ana öneri: Proje, NOVA')).toBeTruthy();
     fireEvent.press(screen.getByText('Projeye devam et'));
     expect(mockRouterPush).toHaveBeenCalledWith('/projects/nova');
   });
@@ -98,21 +104,31 @@ describe('HomeScreen V1.2 progress integration', () => {
     const screen = render(<HomeScreen />);
 
     expect(screen.getByText('Kaldığın Yerden Devam Et')).toBeTruthy();
+    expect(screen.getAllByLabelText(/^Ana öneri:/)).toHaveLength(1);
+    expect(screen.getByLabelText('Ana öneri: ProjectLab’e başla')).toBeTruthy();
     expect(screen.getByText('ProjectLab’e başla')).toBeTruthy();
     expect(screen.queryByText('internal-route')).toBeNull();
   });
 
-  it('shows lesson completion, percentage, XP and level from learning stats', () => {
+  it('shows lesson and quiz completion counts and percentages from learning stats', () => {
     setProgress({
       totalXp: 20,
       lessons: [{ lessonId: 'design-tokens', completedAt: '2026-09-27T10:00:00.000Z' }],
+      quizzes: [{
+        quizId: 'design-tokens-quiz',
+        currentQuestionIndex: 3,
+        answers: [],
+        bestCorrectAnswerCount: 2,
+        completedAt: '2026-09-27T10:05:00.000Z',
+      }],
     });
     const screen = render(<HomeScreen />);
 
-    expect(screen.getByLabelText('Öğrenme özeti: 1/3 ders, yüzde 33, 20 XP, seviye 3')).toBeTruthy();
+    expect(screen.getByLabelText('Öğrenme özeti: 1/3 ders, yüzde 33; 1/3 quiz, yüzde 33')).toBeTruthy();
     expect(screen.getByLabelText('Ders ilerlemesi yüzde 33')).toBeTruthy();
-    expect(screen.getByText('1/3')).toBeTruthy();
-    expect(screen.getByText('%33')).toBeTruthy();
+    expect(screen.getByLabelText('Quiz ilerlemesi yüzde 33')).toBeTruthy();
+    expect(screen.getAllByText('1/3')).toHaveLength(2);
+    expect(screen.getAllByText('%33')).toHaveLength(2);
   });
 
   it('falls back from an invalid learning date to a valid project visit', () => {
@@ -127,6 +143,7 @@ describe('HomeScreen V1.2 progress integration', () => {
     const screen = render(<HomeScreen />);
 
     expect(screen.getByText('SON AKTİVİTE · PROJE')).toBeTruthy();
+    expect(screen.getAllByLabelText(/^Ana öneri:/)).toHaveLength(1);
     expect(screen.getAllByText('ELORA').length).toBeGreaterThan(0);
     fireEvent.press(screen.getByText('Projeye devam et'));
     expect(mockRouterPush).toHaveBeenCalledWith('/projects/elora');

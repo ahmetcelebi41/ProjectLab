@@ -103,36 +103,44 @@ function LoadingHome() {
   );
 }
 
-function LearningOverview({ stats }: { stats: LearningStats }) {
+function LearningOverview({ compact, stats }: { compact: boolean; stats: LearningStats }) {
   return (
     <Card
-      accessibilityLabel={`Öğrenme özeti: ${stats.completedLessons}/${stats.totalLessons} ders, yüzde ${stats.lessonCompletionRate}, ${stats.xp} XP, seviye ${stats.level}`}
+      accessibilityLabel={`Öğrenme özeti: ${stats.completedLessons}/${stats.totalLessons} ders, yüzde ${stats.lessonCompletionPercent}; ${stats.completedQuizzes}/${stats.totalQuizzes} quiz, yüzde ${stats.quizCompletionPercent}`}
       style={styles.overviewCard}
     >
       <View style={styles.overviewTopRow}>
-        <View style={styles.overviewItem}>
+        <View style={[styles.overviewItem, compact && styles.overviewItemCompact]}>
           <Typography color="textSecondary" variant="caption">DERSLER</Typography>
           <Typography variant="h3">
             {stats.completedLessons}/{stats.totalLessons}
           </Typography>
         </View>
-        <View style={styles.overviewItem}>
-          <Typography color="textSecondary" variant="caption">İLERLEME</Typography>
-          <Typography variant="h3">%{stats.lessonCompletionRate}</Typography>
+        <View style={[styles.overviewItem, compact && styles.overviewItemCompact]}>
+          <Typography color="textSecondary" variant="caption">DERS İLERLEMESİ</Typography>
+          <Typography variant="h3">%{stats.lessonCompletionPercent}</Typography>
         </View>
-        <View style={styles.overviewItem}>
-          <Typography color="textSecondary" variant="caption">XP</Typography>
-          <Typography variant="h3">{stats.xp}</Typography>
+        <View style={[styles.overviewItem, compact && styles.overviewItemCompact]}>
+          <Typography color="textSecondary" variant="caption">QUIZLER</Typography>
+          <Typography variant="h3">
+            {stats.completedQuizzes}/{stats.totalQuizzes}
+          </Typography>
         </View>
-        <View style={styles.overviewItem}>
-          <Typography color="textSecondary" variant="caption">SEVİYE</Typography>
-          <Typography variant="h3">{stats.level}</Typography>
+        <View style={[styles.overviewItem, compact && styles.overviewItemCompact]}>
+          <Typography color="textSecondary" variant="caption">QUIZ İLERLEMESİ</Typography>
+          <Typography variant="h3">%{stats.quizCompletionPercent}</Typography>
         </View>
       </View>
-      <Progress
-        accessibilityLabel={`Ders ilerlemesi yüzde ${stats.lessonCompletionRate}`}
-        value={stats.lessonCompletionRate}
-      />
+      <View style={styles.overviewProgressList}>
+        <Progress
+          accessibilityLabel={`Ders ilerlemesi yüzde ${stats.lessonCompletionPercent}`}
+          value={stats.lessonCompletionPercent}
+        />
+        <Progress
+          accessibilityLabel={`Quiz ilerlemesi yüzde ${stats.quizCompletionPercent}`}
+          value={stats.quizCompletionPercent}
+        />
+      </View>
     </Card>
   );
 }
@@ -140,7 +148,11 @@ function LearningOverview({ stats }: { stats: LearningStats }) {
 function ContinueCard({ activity }: { activity: ContinueActivity }) {
   const occurredAt = activity.occurredAt ? formatActivityTime(activity.occurredAt) : undefined;
   return (
-    <Card raised style={styles.continueCard}>
+    <Card
+      accessibilityLabel={`Ana öneri: ${activity.typeLabel}, ${activity.title}`}
+      raised
+      style={styles.continueCard}
+    >
       <View style={styles.cardCopy}>
         <Typography color="primary" variant="caption">
           {`SON AKTİVİTE · ${activity.typeLabel.toUpperCase()}`}
@@ -166,7 +178,7 @@ function ContinueCard({ activity }: { activity: ContinueActivity }) {
 
 function StartCard() {
   return (
-    <Card raised style={styles.continueCard}>
+    <Card accessibilityLabel="Ana öneri: ProjectLab’e başla" raised style={styles.continueCard}>
       <View style={styles.cardCopy}>
         <Typography color="primary" variant="caption">İLK ADIMINI SEÇ</Typography>
         <Typography accessibilityRole="header" variant="h2">ProjectLab’e başla</Typography>
@@ -414,7 +426,7 @@ export function HomeScreen() {
 
       <View style={styles.section}>
         <SectionHeading title="Öğrenme Özeti" />
-        <LearningOverview stats={learningStats} />
+        <LearningOverview compact={width < breakpoints.medium} stats={learningStats} />
       </View>
 
       <View style={styles.section}>
@@ -500,6 +512,12 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     gap: spacing.xxs,
     minWidth: sizing.button.large,
+  },
+  overviewItemCompact: {
+    flexBasis: '40%',
+  },
+  overviewProgressList: {
+    gap: spacing.sm,
   },
   section: {
     gap: spacing.md,
