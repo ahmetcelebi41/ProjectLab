@@ -135,7 +135,7 @@ const styles = StyleSheet.create({
   cardPressable: { borderColor: 'transparent', borderRadius: radius.card, borderWidth: border.width },
   focused: { borderColor: colors.primaryHover },
   pressed: { opacity: border.width / 2 },
-  projectCard: { gap: spacing.lg, height: '100%', padding: spacing.sm },
+  projectCard: { gap: spacing.lg, padding: spacing.sm },
   cardTop: { alignItems: 'flex-start', flexDirection: 'row', gap: spacing.sm, justifyContent: 'space-between' },
   cardTitle: { flex: 1, gap: spacing.xxs, paddingHorizontal: spacing.xxs },
   bodyLine: { lineHeight: spacing.lg, paddingHorizontal: spacing.xxs },

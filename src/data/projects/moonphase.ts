@@ -13,7 +13,7 @@ export const moonphaseProject = {
     'Ürün özellikleri tutarlı alanlarla tanımlanır.',
     'Filtreleme ihtiyaçları veri modeline erken yansıtılır.',
   ],
-  featured: false,
+  featured: true,
   portfolioVisible: true,
   updatedAt: '2026-09-12',
   currentStageId: 'product-structure',
