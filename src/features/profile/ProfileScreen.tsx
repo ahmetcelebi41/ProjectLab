@@ -8,10 +8,22 @@ import { Card } from '@/components/ui/Card';
 import { Progress } from '@/components/ui/Progress';
 import { Screen } from '@/components/ui/Screen';
 import { Typography } from '@/components/ui/Typography';
-import { achievements, lessons, projects, quizzes } from '@/data';
+import {
+  achievements,
+  lessonsById,
+  projects,
+  projectsById,
+  quizzesById,
+} from '@/data';
 import { getLevelProgress, XP_PER_LEVEL } from '@/features/progress/level';
+import {
+  getCategoryProgress,
+  getLearningStats,
+  getQuizStats,
+  type LatestActivity,
+  type QuizStats,
+} from '@/features/progress/learningStats';
 import { getCompletedProjectStageIds } from '@/features/progress/projectProgress';
-import { getProfileLearningStats } from '@/features/profile/profileStats';
 import { useProgressStore } from '@/stores/progressStore';
 import {
   border,
@@ -22,17 +34,7 @@ import {
   sizing,
   spacing,
 } from '@/theme/tokens';
-import type { LessonCategory, Project, ProjectProgress } from '@/types';
-
-const categoryLabels: Record<LessonCategory, string> = {
-  'ui-ux': 'UI/UX',
-  frontend: 'Frontend',
-  'backend-api': 'Backend & API',
-  database: 'Veritabanı',
-  'git-github': 'Git & GitHub',
-  'deploy-cloud': 'Deploy & Cloud',
-  'project-planning': 'Proje Planlama',
-};
+import type { Project, ProjectProgress } from '@/types';
 
 function navigate(href: Href) {
   router.push(href);
@@ -155,7 +157,13 @@ type Metric = Readonly<{
   value: string;
 }>;
 
-function MetricsGrid({ cardWidth, metrics }: { cardWidth: number; metrics: readonly Metric[] }) {
+function MetricsGrid({
+  cardWidth,
+  metrics,
+}: {
+  cardWidth: number | '100%';
+  metrics: readonly Metric[];
+}) {
   return (
     <View style={styles.grid}>
       {metrics.map((metric) => (
@@ -183,10 +191,143 @@ function DomainProgress({ completed, label, total }: {
     <View style={styles.domainRow}>
       <View style={styles.metaRow}>
         <Typography variant="button">{label}</Typography>
-        <Typography color="textSecondary" variant="caption">{completed} / {total}</Typography>
+        <Typography color="textSecondary" variant="caption">
+          {completed} / {total} · %{percentage}
+        </Typography>
       </View>
       <Progress accessibilityLabel={`${label} yüzde ${percentage}`} value={percentage} />
     </View>
+  );
+}
+
+function LearningSummary({
+  completedLessons,
+  completedQuizzes,
+  lessonCompletionRate,
+  quizAccuracy,
+  quizCompletionRate,
+  totalLessons,
+  totalQuizzes,
+}: {
+  completedLessons: number;
+  completedQuizzes: number;
+  lessonCompletionRate: number;
+  quizAccuracy: number | null;
+  quizCompletionRate: number;
+  totalLessons: number;
+  totalQuizzes: number;
+}) {
+  return (
+    <Card style={styles.statsCard}>
+      <Typography accessibilityRole="header" variant="h4">Öğrenme Özeti</Typography>
+      <DomainProgress completed={completedLessons} label="Ders ilerlemesi" total={totalLessons} />
+      <DomainProgress completed={completedQuizzes} label="Quiz ilerlemesi" total={totalQuizzes} />
+      <View style={styles.metaRow}>
+        <Typography variant="button">Genel doğruluk</Typography>
+        <Typography color={quizAccuracy === null ? 'textMuted' : 'text'} variant="h4">
+          {quizAccuracy === null ? 'Veri yetersiz' : `%${quizAccuracy}`}
+        </Typography>
+      </View>
+      <Typography color="textMuted" variant="caption">
+        Ders %{lessonCompletionRate} · Quiz %{quizCompletionRate}
+      </Typography>
+    </Card>
+  );
+}
+
+function CategoryProgressCard({ categories }: {
+  categories: ReturnType<typeof getCategoryProgress>;
+}) {
+  return (
+    <Card style={styles.statsCard}>
+      <Typography accessibilityRole="header" variant="h4">Kategori İlerlemesi</Typography>
+      {categories.map((category) => (
+        <DomainProgress
+          completed={category.completedLessons}
+          key={category.category}
+          label={category.label}
+          total={category.totalLessons}
+        />
+      ))}
+    </Card>
+  );
+}
+
+function QuizPerformance({ stats }: { stats: QuizStats }) {
+  const isIncomplete = stats.historyStatus === 'incomplete-history';
+  const metrics: readonly Metric[] = [
+    {
+      label: isIncomplete ? 'Kayıtlı genel doğruluk' : 'Genel doğruluk',
+      value: stats.quizAccuracy === null ? 'Veri yetersiz' : `%${stats.quizAccuracy}`,
+    },
+    { label: isIncomplete ? 'Kayıtlı full attempt' : 'Full attempt', value: String(stats.fullAttempts) },
+    { label: isIncomplete ? 'Kayıtlı retry attempt' : 'Retry attempt', value: String(stats.retryAttempts) },
+    { label: isIncomplete ? 'Kayıtlı toplam attempt' : 'Toplam attempt', value: String(stats.quizAttempts) },
+  ];
+
+  return (
+    <Card style={styles.statsCard}>
+      <Typography accessibilityRole="header" variant="h4">Quiz Performansı</Typography>
+      <MetricsGrid cardWidth="100%" metrics={metrics} />
+      {isIncomplete ? (
+        <Typography accessibilityLabel="Geçmiş quiz verisi eksik" color="textMuted" variant="small">
+          Geçmiş quiz verisi eksik. Yalnızca kayıtlı denemeler gösteriliyor.
+        </Typography>
+      ) : stats.historyStatus === 'no-data' ? (
+        <Typography color="textMuted" variant="small">Henüz quiz performans verisi yok.</Typography>
+      ) : null}
+    </Card>
+  );
+}
+
+function getActivityDetails(activity: LatestActivity): Readonly<{ title: string; type: string }> {
+  if (activity.type === 'lesson') {
+    return { title: lessonsById[activity.lessonId]?.title ?? 'Ders', type: 'Ders' };
+  }
+  if (activity.type === 'quiz') {
+    return { title: quizzesById[activity.quizId]?.title ?? 'Quiz', type: 'Quiz' };
+  }
+  return { title: projectsById[activity.projectId]?.title ?? 'Proje', type: 'Proje' };
+}
+
+function formatActivityDate(value: string): string {
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return 'Tarih bilgisi yok';
+
+  return new Intl.DateTimeFormat('tr-TR', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).format(date);
+}
+
+function LastActivityCard({ activity }: { activity: LatestActivity | null }) {
+  if (!activity) {
+    return (
+      <Card style={styles.statsCard}>
+        <Typography accessibilityRole="header" variant="h4">Son Aktivite</Typography>
+        <Typography color="textMuted">Henüz aktivite yok.</Typography>
+      </Card>
+    );
+  }
+
+  const details = getActivityDetails(activity);
+  const date = formatActivityDate(activity.occurredAt);
+
+  return (
+    <Card
+      accessibilityLabel={`Son aktivite, ${details.type}, ${details.title}, ${date}`}
+      style={styles.statsCard}
+    >
+      <Typography accessibilityRole="header" variant="h4">Son Aktivite</Typography>
+      <View style={styles.metaRow}>
+        <View style={styles.cardCopy}>
+          <Typography variant="button">{details.title}</Typography>
+          <Typography color="textSecondary" variant="small">Tür: {details.type}</Typography>
+        </View>
+        <Typography color="textSecondary" variant="small">{date}</Typography>
+      </View>
+    </Card>
   );
 }
 
@@ -217,33 +358,6 @@ function ProjectProgressCard({ progress, project, width }: {
       <Typography color="textMuted" variant="caption">
         {completedStageCount} / {project.stages.length} aşama tamamlandı
       </Typography>
-    </Card>
-  );
-}
-
-function LearningTopics({ completedLessonIds }: { completedLessonIds: ReadonlySet<string> }) {
-  const topics = Object.entries(
-    lessons.reduce<Partial<Record<LessonCategory, { completed: number; total: number }>>>((result, lesson) => {
-      const current = result[lesson.category] ?? { completed: 0, total: 0 };
-      result[lesson.category] = {
-        completed: current.completed + (completedLessonIds.has(lesson.id) ? 1 : 0),
-        total: current.total + 1,
-      };
-      return result;
-    }, {}),
-  ) as [LessonCategory, { completed: number; total: number }][];
-
-  return (
-    <Card style={styles.learningCard}>
-      <Typography accessibilityRole="header" variant="h4">Öğrenme konuları</Typography>
-      {topics.map(([category, counts]) => (
-        <DomainProgress
-          completed={counts.completed}
-          key={category}
-          label={categoryLabels[category]}
-          total={counts.total}
-        />
-      ))}
     </Card>
   );
 }
@@ -296,6 +410,7 @@ export function ProfileScreen() {
   const lessonProgress = useProgressStore((state) => state.lessons);
   const quizProgress = useProgressStore((state) => state.quizzes);
   const quizHistory = useProgressStore((state) => state.quizHistory);
+  const lastActivity = useProgressStore((state) => state.lastActivity);
   const earnedAchievementIds = useProgressStore((state) => state.earnedAchievementIds);
 
   if (!hasHydrated) return <LoadingProfile />;
@@ -318,11 +433,17 @@ export function ProfileScreen() {
   const achievementCardWidth =
     (contentWidth - spacing.md * (achievementColumns - 1)) / achievementColumns;
 
-  const completedLessonIds = new Set(
-    lessonProgress.filter((item) => item.completedAt).map((item) => item.lessonId),
-  );
-  const learningStats = getProfileLearningStats(lessonProgress, quizHistory);
-  const completedQuizCount = quizProgress.filter((item) => item.completedAt).length;
+  const progressSource = {
+    totalXp,
+    projects: projectProgress,
+    lessons: lessonProgress,
+    quizzes: quizProgress,
+    quizHistory,
+    lastActivity,
+  };
+  const learningStats = getLearningStats(progressSource);
+  const categoryProgress = getCategoryProgress(progressSource);
+  const quizStats = getQuizStats(progressSource);
   const completedProjectCount = projects.filter(
     (project) => getCompletedStageCount(project) === project.stages.length,
   ).length;
@@ -330,11 +451,6 @@ export function ProfileScreen() {
   const metrics: readonly Metric[] = [
     { label: 'Toplam proje', value: String(projects.length) },
     { label: 'Tamamlanan proje', value: String(completedProjectCount) },
-    { label: 'Tamamlanan ders', value: String(learningStats.completedLessonCount) },
-    { label: 'Full quiz denemesi', value: String(learningStats.fullQuizAttemptCount) },
-    ...(learningStats.bestFullQuizScore === undefined
-      ? []
-      : [{ label: 'En iyi full quiz skoru', value: `%${learningStats.bestFullQuizScore}` }]),
     { label: 'Kazanılan başarım', value: `${earnedIds.size} / ${achievements.length}` },
   ];
 
@@ -353,32 +469,20 @@ export function ProfileScreen() {
           title="İlerlemem"
         />
         <MetricsGrid cardWidth={summaryCardWidth} metrics={metrics} />
-        {learningStats.completedLessonCount === 0 && learningStats.fullQuizAttemptCount === 0 ? (
-          <Card accessibilityLabel="Öğrenme ilerlemesi başlangıç durumu" style={styles.emptyCard}>
-            <Typography accessibilityRole="header" variant="h4">İlk adımını at</Typography>
-            <Typography color="textSecondary" style={styles.bodyLine}>
-              Bir ders veya full quiz tamamladığında öğrenme istatistiklerin burada görünecek.
-            </Typography>
-          </Card>
-        ) : learningStats.fullQuizAttemptCount === 0 ? (
-          <Card accessibilityLabel="Henüz tamamlanan full quiz yok" style={styles.emptyCard}>
-            <Typography accessibilityRole="header" variant="h4">Henüz quiz denemesi yok</Typography>
-            <Typography color="textSecondary" style={styles.bodyLine}>
-              Bir full quiz tamamladığında deneme sayın ve en iyi skorun burada görünecek.
-            </Typography>
-          </Card>
-        ) : learningStats.completedLessonCount === 0 ? (
-          <Card accessibilityLabel="Henüz tamamlanan ders yok" style={styles.emptyCard}>
-            <Typography accessibilityRole="header" variant="h4">Henüz tamamlanan ders yok</Typography>
-            <Typography color="textSecondary" style={styles.bodyLine}>
-              İlk dersini tamamladığında konu ilerlemen burada görünmeye başlayacak.
-            </Typography>
-          </Card>
-        ) : null}
+        <LearningSummary
+          completedLessons={learningStats.completedLessons}
+          completedQuizzes={learningStats.completedQuizzes}
+          lessonCompletionRate={learningStats.lessonCompletionRate}
+          quizAccuracy={quizStats.quizAccuracy}
+          quizCompletionRate={learningStats.quizCompletionRate}
+          totalLessons={learningStats.totalLessons}
+          totalQuizzes={learningStats.totalQuizzes}
+        />
+        <CategoryProgressCard categories={categoryProgress} />
+        <QuizPerformance stats={quizStats} />
+        <LastActivityCard activity={learningStats.lastActivity} />
         <Card style={styles.domainCard}>
           <DomainProgress completed={completedProjectCount} label="Projeler" total={projects.length} />
-          <DomainProgress completed={completedLessonIds.size} label="Dersler" total={lessons.length} />
-          <DomainProgress completed={completedQuizCount} label="Quizler" total={quizzes.length} />
         </Card>
         <View style={styles.grid}>
           {projects.map((project) => (
@@ -390,7 +494,6 @@ export function ProfileScreen() {
             />
           ))}
         </View>
-        <LearningTopics completedLessonIds={completedLessonIds} />
         <Button
           accessibilityLabel="Ayrıntılı ilerlemeyi aç"
           onPress={() => navigate('/profile/progress')}
@@ -515,9 +618,6 @@ const styles = StyleSheet.create({
   domainCard: {
     gap: spacing.lg,
   },
-  emptyCard: {
-    gap: spacing.xs,
-  },
   domainRow: {
     gap: spacing.xs,
   },
@@ -531,7 +631,7 @@ const styles = StyleSheet.create({
   projectCard: {
     gap: spacing.md,
   },
-  learningCard: {
+  statsCard: {
     gap: spacing.lg,
   },
   achievementCard: {
