@@ -12,6 +12,12 @@ import { Typography } from '@/components/ui/Typography';
 import { lessons } from '@/data/lessons';
 import { projects, projectsById } from '@/data/projects';
 import { getTopicProgressPercentage, isLessonCompleted } from '@/features/progress/lessonProgress';
+import {
+  getCategoryProgress,
+  getLearningStats,
+  type CategoryProgress,
+  type LearningStats,
+} from '@/features/progress/learningStats';
 import { useProgressStore } from '@/stores/progressStore';
 import {
   border,
@@ -136,39 +142,75 @@ function LoadingLearn() {
   );
 }
 
-function LearningSummary({ progress }: { progress: readonly LessonProgress[] }) {
-  const completedCount = lessons.filter((lesson) => isLessonCompleted(progress, lesson.id)).length;
-  const activeCount = lessons.filter(
-    (lesson) => getLessonStatus(progress.find((item) => item.lessonId === lesson.id)) === 'in-progress',
-  ).length;
-  const progressValue = Math.round((completedCount / lessons.length) * 100);
-
+function LearningSummary({ stats }: { stats: LearningStats }) {
   return (
     <Card
-      accessibilityLabel={`${lessons.length} dersten ${completedCount} tanesi tamamlandı, ${activeCount} ders devam ediyor`}
+      accessibilityLabel={`${stats.totalLessons} dersten ${stats.completedLessons} tanesi tamamlandı, yüzde ${stats.lessonCompletionRate}, ${stats.xp} XP, seviye ${stats.level}`}
       style={styles.summaryCard}
     >
       <View style={styles.summaryTop}>
         <View style={styles.summaryCopy}>
           <Typography accessibilityRole="header" variant="h4">Öğrenme ilerlemen</Typography>
           <Typography color="textMuted" variant="small">
-            {activeCount > 0 ? `${activeCount} ders devam ediyor` : 'Yeni bir konu seçerek devam et'}
+            {stats.completedLessons}/{stats.totalLessons} ders tamamlandı
           </Typography>
         </View>
-        <Typography color="primary" variant="h2">%{progressValue}</Typography>
+        <Typography color="primary" variant="h2">%{stats.lessonCompletionRate}</Typography>
       </View>
       <Progress
-        accessibilityLabel={`Ders tamamlama ilerlemesi yüzde ${progressValue}`}
-        color={completedCount === lessons.length ? 'success' : 'primary'}
-        value={progressValue}
+        accessibilityLabel={`Genel ders ilerlemesi yüzde ${stats.lessonCompletionRate}`}
+        color={stats.completedLessons === stats.totalLessons ? 'success' : 'primary'}
+        value={stats.lessonCompletionRate}
       />
-      <View style={styles.metricRow}>
-        <Typography color="textSecondary" variant="caption">{completedCount} tamamlandı</Typography>
-        <Typography color="textSecondary" variant="caption">
-          {lessons.length - completedCount} kaldı
-        </Typography>
+      <View style={styles.summaryMetrics}>
+        <View style={styles.summaryMetric}>
+          <Typography color="textMuted" variant="caption">Mevcut XP</Typography>
+          <Typography variant="h4">{stats.xp} XP</Typography>
+        </View>
+        <View style={styles.summaryMetric}>
+          <Typography color="textMuted" variant="caption">Mevcut seviye</Typography>
+          <Typography variant="h4">Seviye {stats.level}</Typography>
+        </View>
       </View>
     </Card>
+  );
+}
+
+function CategoryProgressOverview({ categories, cardWidth }: {
+  categories: readonly CategoryProgress[];
+  cardWidth: number;
+}) {
+  return (
+    <View style={styles.section}>
+      <SectionHeading title="Kategori ilerlemesi" />
+      <View style={styles.categoryGrid}>
+        {categories.map((category) => (
+          <Card
+            accessibilityLabel={`${category.label}, ${category.totalLessons} dersten ${category.completedLessons} tamamlandı, yüzde ${category.completionRate}`}
+            key={category.category}
+            style={[styles.categoryCard, { width: cardWidth }]}
+          >
+            <View style={styles.metricRow}>
+              <Typography accessibilityRole="header" variant="button">{category.label}</Typography>
+              <Typography
+                color={category.completionRate === 100 ? 'success' : 'primary'}
+                variant="caption"
+              >
+                %{category.completionRate}
+              </Typography>
+            </View>
+            <Typography color="textSecondary" variant="caption">
+              {category.completedLessons}/{category.totalLessons} ders
+            </Typography>
+            <Progress
+              accessibilityLabel={`${category.label} ilerlemesi yüzde ${category.completionRate}`}
+              color={category.completionRate === 100 ? 'success' : 'primary'}
+              value={category.completionRate}
+            />
+          </Card>
+        ))}
+      </View>
+    </View>
   );
 }
 
@@ -261,7 +303,7 @@ function LessonCard({ lesson, progress, width }: {
       onPress={() => router.push(lessonHref(lesson))}
       style={({ pressed }) => [styles.cardPressable, { width }, focused && styles.focusedControl, pressed && styles.cardPressed]}
     >
-      <Card style={styles.lessonCard}>
+      <Card style={[styles.lessonCard, status === 'completed' && styles.completedLessonCard]}>
         <View style={styles.cardTop}>
           <Badge variant={statusDetail.variant}>{statusDetail.label}</Badge>
           <Typography color="textMuted" variant="caption">{categoryLabels[lesson.category]}</Typography>
@@ -283,7 +325,7 @@ function LessonCard({ lesson, progress, width }: {
           </View>
         </View>
         <View style={styles.cardAction}>
-          <Typography color="primary" variant="button">
+          <Typography color={status === 'completed' ? 'success' : 'primary'} variant="button">
             {status === 'completed' ? 'Tekrar İncele' : status === 'in-progress' ? 'Devam Et' : 'Dersi Aç'}
           </Typography>
           <Typography accessibilityElementsHidden color="primary" importantForAccessibility="no" variant="h4">→</Typography>
@@ -363,6 +405,11 @@ export function LearnScreen() {
   const [category, setCategory] = useState<CategoryFilter>('all');
   const hasHydrated = useProgressStore((state) => state.hasHydrated);
   const storedProgress = useProgressStore((state) => state.lessons);
+  const totalXp = useProgressStore((state) => state.totalXp);
+  const projectProgress = useProgressStore((state) => state.projects);
+  const quizProgress = useProgressStore((state) => state.quizzes);
+  const quizHistory = useProgressStore((state) => state.quizHistory);
+  const lastActivity = useProgressStore((state) => state.lastActivity);
 
   const horizontalPadding = width >= breakpoints.medium
     ? layout.horizontalPadding.wide.min
@@ -374,13 +421,42 @@ export function LearnScreen() {
       ? layout.columns.wide.min
       : layout.columns.mobile;
   const cardWidth = (contentWidth - spacing.md * (columns - 1)) / columns;
+  const categoryColumns = width >= breakpoints.medium ? 4 : 2;
+  const categoryCardWidth = (contentWidth - spacing.sm * (categoryColumns - 1)) / categoryColumns;
+
+  const progressSource = useMemo(() => ({
+    totalXp,
+    projects: projectProgress,
+    lessons: storedProgress,
+    quizzes: quizProgress,
+    quizHistory,
+    lastActivity,
+  }), [lastActivity, projectProgress, quizHistory, quizProgress, storedProgress, totalXp]);
+  const learningStats = useMemo(() => getLearningStats(progressSource), [progressSource]);
+  const categoryProgress = useMemo(() => getCategoryProgress(progressSource), [progressSource]);
 
   const unfinishedLesson = useMemo(
-    () => lessons.find((lesson) => {
-      const progress = storedProgress.find((item) => item.lessonId === lesson.id);
-      return getLessonStatus(progress) === 'in-progress';
-    }),
-    [storedProgress],
+    () => {
+      const lastActiveLessonId = learningStats.lastActivity?.type === 'lesson'
+        ? learningStats.lastActivity.lessonId
+        : undefined;
+      const lastActiveLesson = lastActiveLessonId
+        ? lessons.find((lesson) => lesson.id === lastActiveLessonId)
+        : undefined;
+      const lastActiveProgress = lastActiveLesson
+        ? storedProgress.find((item) => item.lessonId === lastActiveLesson.id)
+        : undefined;
+
+      if (lastActiveLesson && getLessonStatus(lastActiveProgress) === 'in-progress') {
+        return lastActiveLesson;
+      }
+
+      return lessons.find((lesson) => {
+        const progress = storedProgress.find((item) => item.lessonId === lesson.id);
+        return getLessonStatus(progress) === 'in-progress';
+      });
+    },
+    [learningStats.lastActivity, storedProgress],
   );
 
   const todayLesson = useMemo(
@@ -413,7 +489,9 @@ export function LearnScreen() {
         </Typography>
       </View>
 
-      <LearningSummary progress={storedProgress} />
+      <LearningSummary stats={learningStats} />
+
+      <CategoryProgressOverview categories={categoryProgress} cardWidth={categoryCardWidth} />
 
       {unfinishedLesson ? <ContinueLesson lesson={unfinishedLesson} /> : null}
 
@@ -495,6 +573,8 @@ const styles = StyleSheet.create({
   summaryCard: { gap: spacing.md, padding: spacing.lg },
   summaryTop: { alignItems: 'center', flexDirection: 'row', gap: spacing.md, justifyContent: 'space-between' },
   summaryCopy: { flex: 1, gap: spacing.xxs },
+  summaryMetrics: { flexDirection: 'row', gap: spacing.md },
+  summaryMetric: { flex: 1, gap: spacing.xxs },
   metricRow: { flexDirection: 'row', justifyContent: 'space-between' },
   section: { gap: spacing.md },
   sectionHeading: { gap: spacing.xs, maxWidth: layout.readingWidth.min },
@@ -505,9 +585,12 @@ const styles = StyleSheet.create({
   filterRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
   filterButton: { borderRadius: radius.pill },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md },
+  categoryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  categoryCard: { gap: spacing.sm },
   cardPressable: { borderColor: 'transparent', borderRadius: radius.card, borderWidth: border.width },
   cardPressed: { backgroundColor: colors.surfaceRaised },
   lessonCard: { gap: spacing.lg },
+  completedLessonCard: { borderColor: colors.success },
   cardTop: { alignItems: 'flex-start', flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, justifyContent: 'space-between' },
   cardCopy: { flex: 1, gap: spacing.xs },
   cardSummary: { lineHeight: spacing.lg },
