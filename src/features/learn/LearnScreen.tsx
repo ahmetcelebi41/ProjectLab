@@ -186,26 +186,26 @@ function CategoryProgressOverview({ categories, cardWidth }: {
       <View style={styles.categoryGrid}>
         {categories.map((category) => (
           <Card
-            accessibilityLabel={`${category.label}, ${category.totalLessons} dersten ${category.completedLessons} tamamlandı, yüzde ${category.completionRate}`}
-            key={category.category}
+            accessibilityLabel={`${category.name}, ${category.totalLessons} dersten ${category.completedLessons} tamamlandı, yüzde ${category.completionPercent}`}
+            key={category.id}
             style={[styles.categoryCard, { width: cardWidth }]}
           >
             <View style={styles.metricRow}>
-              <Typography accessibilityRole="header" variant="button">{category.label}</Typography>
+              <Typography accessibilityRole="header" variant="button">{category.name}</Typography>
               <Typography
-                color={category.completionRate === 100 ? 'success' : 'primary'}
+                color={category.completionPercent === 100 ? 'success' : 'primary'}
                 variant="caption"
               >
-                %{category.completionRate}
+                %{category.completionPercent}
               </Typography>
             </View>
             <Typography color="textSecondary" variant="caption">
               {category.completedLessons}/{category.totalLessons} ders
             </Typography>
             <Progress
-              accessibilityLabel={`${category.label} ilerlemesi yüzde ${category.completionRate}`}
-              color={category.completionRate === 100 ? 'success' : 'primary'}
-              value={category.completionRate}
+              accessibilityLabel={`${category.name} ilerlemesi yüzde ${category.completionPercent}`}
+              color={category.completionPercent === 100 ? 'success' : 'primary'}
+              value={category.completionPercent}
             />
           </Card>
         ))}

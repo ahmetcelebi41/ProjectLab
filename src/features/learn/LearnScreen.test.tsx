@@ -43,6 +43,12 @@ describe('LearnScreen V1.2 progress integration', () => {
     expect(screen.getByText('0 XP')).toBeTruthy();
     expect(screen.getByText('Seviye 1')).toBeTruthy();
     expect(screen.queryByText('Devam Et')).toBeNull();
+    expect(screen.getByLabelText('Frontend, 0 dersten 0 tamamlandı, yüzde 0')).toBeTruthy();
+    expect(screen.getByLabelText('Frontend ilerlemesi yüzde 0').props.accessibilityValue).toEqual({
+      max: 100,
+      min: 0,
+      now: 0,
+    });
 
     fireEvent.press(screen.getByLabelText('Bugün Öğren: Design Token ile Tutarlı Arayüz'));
     expect(mockRouterPush).toHaveBeenCalledWith('/learn/design-tokens');
@@ -62,12 +68,39 @@ describe('LearnScreen V1.2 progress integration', () => {
     expect(screen.getByText('1/3 ders tamamlandı')).toBeTruthy();
     expect(screen.getByText('20 XP')).toBeTruthy();
     expect(screen.getByText('Seviye 3')).toBeTruthy();
+    expect(screen.getAllByLabelText(/^(UI\/UX|Frontend|Backend|DevOps),/).map(
+      (card) => card.props.accessibilityLabel,
+    )).toEqual([
+      'UI/UX, 2 dersten 1 tamamlandı, yüzde 50',
+      'Frontend, 0 dersten 0 tamamlandı, yüzde 0',
+      'Backend, 1 dersten 0 tamamlandı, yüzde 0',
+      'DevOps, 0 dersten 0 tamamlandı, yüzde 0',
+    ]);
     expect(screen.getByLabelText('UI/UX ilerlemesi yüzde 50')).toBeTruthy();
     expect(screen.getByLabelText('Frontend ilerlemesi yüzde 0')).toBeTruthy();
     expect(screen.getByLabelText('Backend ilerlemesi yüzde 0')).toBeTruthy();
     expect(screen.getByLabelText('DevOps ilerlemesi yüzde 0')).toBeTruthy();
     fireEvent.press(screen.getByLabelText('API Contract Tasarlamak dersine devam et'));
     expect(mockRouterPush).toHaveBeenCalledWith('/learn/api-contracts');
+  });
+
+  it('does not render duplicate completions above the category total', () => {
+    setProgress({
+      lessons: [
+        { lessonId: 'design-tokens', completedAt },
+        { lessonId: 'design-tokens', completedAt },
+        { lessonId: 'product-taxonomy', completedAt },
+      ],
+    });
+    const screen = render(<LearnScreen />);
+
+    expect(screen.getByLabelText('UI/UX, 2 dersten 2 tamamlandı, yüzde 100')).toBeTruthy();
+    expect(screen.getByLabelText('UI/UX ilerlemesi yüzde 100').props.accessibilityValue).toEqual({
+      max: 100,
+      min: 0,
+      now: 100,
+    });
+    expect(screen.queryByText('3/2 ders')).toBeNull();
   });
 
   it('keeps completed lessons visible and re-openable', () => {
