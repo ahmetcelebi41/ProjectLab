@@ -76,7 +76,12 @@ describe('QuizResultScreen attempt details', () => {
     expect(screen.getByLabelText('Soru 2, yanlış')).toBeTruthy();
     expect(screen.getByLabelText('Soru 3, yanlış')).toBeTruthy();
     expect(screen.getByText(designTokensQuiz.questions[1].explanation)).toBeTruthy();
-    expect(screen.getByText('+0')).toBeTruthy();
+    expect(screen.getByText('+0 XP')).toBeTruthy();
+    expect(screen.getByLabelText('Toplam deneme 2')).toBeTruthy();
+    expect(screen.getByText('Toplam deneme')).toBeTruthy();
+    expect(screen.getByText('Full deneme')).toBeTruthy();
+    expect(screen.getByText('Retry denemesi')).toBeTruthy();
+    expect(screen.getByText('Genel doğruluk')).toBeTruthy();
 
     const historyBeforeRerender = useProgressStore.getState().quizHistory;
     const xpBeforeRerender = useProgressStore.getState().totalXp;
@@ -108,7 +113,11 @@ describe('QuizResultScreen attempt details', () => {
     expect(screen.getByText('Mükemmel sonuç')).toBeTruthy();
     expect(screen.getByText('Tüm soruları doğru yanıtladın. Öğren’e dönerek sıradaki konuya geçebilirsin.')).toBeTruthy();
     expect(screen.getByLabelText('Yüzde 100')).toBeTruthy();
-    expect(screen.getByText('+40')).toBeTruthy();
+    expect(screen.getByText('+40 XP')).toBeTruthy();
+    expect(screen.getByText('Full')).toBeTruthy();
+    expect(screen.getByText('3/3')).toBeTruthy();
+    expect(screen.getByText('Quiz durumu')).toBeTruthy();
+    expect(screen.getByText('Tamamlandı')).toBeTruthy();
     expect(screen.queryByText('Yanlışları Tekrarla')).toBeNull();
     fireEvent.press(screen.getByText('Öğren’e Dön'));
     expect(mockRouterReplace).toHaveBeenCalledWith('/learn');
@@ -149,7 +158,9 @@ describe('QuizResultScreen attempt details', () => {
     expect(screen.getByText('En iyi tam quiz: 2/3')).toBeTruthy();
     expect(screen.getByLabelText('Soru 3, doğru')).toBeTruthy();
     expect(screen.queryByLabelText('Soru 1, doğru')).toBeNull();
-    expect(screen.getByText('+0')).toBeTruthy();
+    expect(screen.getByText('+0 XP')).toBeTruthy();
+    expect(screen.getByText('Retry')).toBeTruthy();
+    expect(screen.getByText('1/1')).toBeTruthy();
   });
 
   it('shows every question as wrong for a zero score without technical route copy', () => {
@@ -177,5 +188,60 @@ describe('QuizResultScreen attempt details', () => {
     expect(screen.getByText('Son tam quiz: 2/3')).toBeTruthy();
     expect(screen.getByLabelText('Soru 3, yanlış')).toBeTruthy();
     expect(screen.getByText('Yanlışları Tekrarla')).toBeTruthy();
+    expect(screen.getByText('Geçmiş quiz verisi eksik')).toBeTruthy();
+    expect(screen.queryByText('Genel doğruluk')).toBeNull();
+  });
+
+  it('does not report XP for a retry when full history is missing', () => {
+    const retryAttempt: QuizAttempt = {
+      quizId: designTokensQuiz.id,
+      attemptType: 'retry',
+      completedAt: secondCompletedAt,
+      correctAnswerCount: 1,
+      questionCount: 1,
+      wrongQuestionIds: [],
+    };
+    setCompletedQuiz([retryAttempt], 10);
+    useProgressStore.setState({
+      quizzes: [{
+        quizId: designTokensQuiz.id,
+        currentQuestionIndex: designTokensQuiz.questions.length - 1,
+        answers: [{ questionId: 'safe-change', selectedOptionId: 'update-token' }],
+        bestCorrectAnswerCount: 2,
+        awardedXp: 10,
+        completedAt: firstCompletedAt,
+      }],
+    });
+
+    const screen = render(
+      <QuizResultScreen lessonId="design-tokens" quizId="design-tokens-quiz" />,
+    );
+
+    expect(screen.getByText('Retry')).toBeTruthy();
+    expect(screen.getByText('+0 XP')).toBeTruthy();
+    expect(screen.getByText('Geçmiş quiz verisi eksik')).toBeTruthy();
+    expect(screen.queryByText('Genel doğruluk')).toBeNull();
+  });
+
+  it('shows the neutral result state when no quiz result data exists', () => {
+    useProgressStore.setState({
+      schemaVersion: PROGRESS_SCHEMA_VERSION,
+      totalXp: 0,
+      projects: [],
+      lessons: [],
+      quizzes: [],
+      quizHistory: [],
+      lastActivity: null,
+      earnedAchievementIds: [],
+      hasHydrated: true,
+    });
+
+    const screen = render(
+      <QuizResultScreen lessonId="design-tokens" quizId="design-tokens-quiz" />,
+    );
+
+    expect(screen.getByText('Sonuç henüz hazır değil')).toBeTruthy();
+    expect(screen.getByText('Önce quizi tamamla')).toBeTruthy();
+    expect(screen.queryByText('Genel doğruluk')).toBeNull();
   });
 });

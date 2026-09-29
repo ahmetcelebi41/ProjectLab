@@ -8,6 +8,7 @@ import { Card } from '@/components/ui/Card';
 import { Progress } from '@/components/ui/Progress';
 import { Screen } from '@/components/ui/Screen';
 import { Typography } from '@/components/ui/Typography';
+import { getQuizStats } from '@/features/progress/learningStats';
 import { useProgressStore } from '@/stores/progressStore';
 import { colors, layout, radius, spacing } from '@/theme/tokens';
 
@@ -98,14 +99,23 @@ export function QuizResultScreen({ lessonId, quizId }: Props) {
   const lastScore = getQuizAttemptScore(lastAttempt);
   const lastFullScore = getLastQuizScore(attemptHistory, quiz.id);
   const bestScore = getBestQuizScore(attemptHistory, quiz.id) ?? lastFullScore;
+  const quizStats = getQuizStats({
+    quizzes: savedProgress ? [savedProgress] : [],
+    quizHistory,
+  }, [quiz]);
   const incorrectQuestions = getQuizRetryQuestions(quiz, lastAttempt);
   const incorrectQuestionIds = new Set(incorrectQuestions.map((question) => question.id));
   const attemptedQuestionIds = new Set(savedProgress.answers.map((answer) => answer.questionId));
   const resultQuestions = lastAttempt.attemptType === 'retry'
     ? quiz.questions.filter((question) => attemptedQuestionIds.has(question.id))
     : quiz.questions;
-  const firstAttempt = attemptHistory.find((attempt) => attempt.quizId === quiz.id);
-  const awardedXp = firstAttempt === lastAttempt ? savedProgress.awardedXp : undefined;
+  const firstFullAttempt = attemptHistory.find((attempt) => (
+    attempt.quizId === quiz.id && attempt.attemptType !== 'retry'
+  ));
+  const awardedXp = lastAttempt.attemptType !== 'retry' && firstFullAttempt === lastAttempt
+    ? savedProgress.awardedXp ?? 0
+    : 0;
+  const attemptTypeLabel = lastAttempt.attemptType === 'retry' ? 'Retry' : 'Full';
   const quizPath = `/learn/${quiz.lessonId}/quiz/${quiz.id}`;
 
   return (
@@ -131,7 +141,7 @@ export function QuizResultScreen({ lessonId, quizId }: Props) {
         <View style={styles.scoreTop}>
           <View style={styles.scoreCopy}>
             <Typography color="textMuted" variant="caption">
-              {lastAttempt.attemptType === 'retry' ? 'RETRY SONUCU' : 'SON SKOR'}
+              {lastAttempt.attemptType === 'retry' ? 'RETRY SONUCU' : 'FULL QUIZ SONUCU'}
             </Typography>
             <Typography accessibilityLabel={`Yüzde ${lastScore.score}`} style={styles.percentage} variant="displayCompact">
               %{lastScore.score}
@@ -146,16 +156,26 @@ export function QuizResultScreen({ lessonId, quizId }: Props) {
         />
         <View style={styles.summaryRow}>
           <View style={styles.summaryItem}>
-            <Typography color="success" variant="h3">{lastScore.correctCount}</Typography>
-            <Typography color="textSecondary">Doğru</Typography>
+            <Typography color="success" variant="h3">
+              {lastScore.correctCount}/{lastAttempt.questionCount}
+            </Typography>
+            <Typography color="textSecondary">Doğru / toplam</Typography>
           </View>
           <View style={styles.summaryItem}>
-            <Typography color={lastScore.wrongCount ? 'error' : 'textMuted'} variant="h3">{lastScore.wrongCount}</Typography>
-            <Typography color="textSecondary">Yanlış</Typography>
+            <Typography color="primary" variant="h3">%{lastScore.score}</Typography>
+            <Typography color="textSecondary">Doğruluk</Typography>
           </View>
           <View style={styles.summaryItem}>
-            <Typography color={awardedXp ? 'primary' : 'textMuted'} variant="h3">+{awardedXp ?? 0}</Typography>
+            <Typography variant="h3">{attemptTypeLabel}</Typography>
+            <Typography color="textSecondary">Deneme türü</Typography>
+          </View>
+          <View style={styles.summaryItem}>
+            <Typography color={awardedXp ? 'primary' : 'textMuted'} variant="h3">+{awardedXp} XP</Typography>
             <Typography color="textSecondary">Bu denemede XP</Typography>
+          </View>
+          <View style={styles.summaryItem}>
+            <Typography color="success" variant="h3">Tamamlandı</Typography>
+            <Typography color="textSecondary">Quiz durumu</Typography>
           </View>
         </View>
         {lastFullScore && bestScore ? (
@@ -168,6 +188,40 @@ export function QuizResultScreen({ lessonId, quizId }: Props) {
             </Typography>
           </View>
         ) : null}
+      </Card>
+
+      <Card accessibilityLiveRegion="polite" style={styles.historyCard}>
+        <View style={styles.copy}>
+          <Typography color="primary" variant="caption">QUIZ GEÇMİŞİ</Typography>
+          <Typography accessibilityRole="header" variant="h3">Deneme özeti</Typography>
+        </View>
+        {quizStats.historyStatus === 'complete' ? (
+          <View style={styles.historyGrid}>
+            <View accessibilityLabel={`Toplam deneme ${quizStats.quizAttempts}`} style={styles.historyItem}>
+              <Typography variant="h4">{quizStats.quizAttempts}</Typography>
+              <Typography color="textSecondary" variant="small">Toplam deneme</Typography>
+            </View>
+            <View accessibilityLabel={`Full deneme ${quizStats.fullAttempts}`} style={styles.historyItem}>
+              <Typography variant="h4">{quizStats.fullAttempts}</Typography>
+              <Typography color="textSecondary" variant="small">Full deneme</Typography>
+            </View>
+            <View accessibilityLabel={`Retry denemesi ${quizStats.retryAttempts}`} style={styles.historyItem}>
+              <Typography variant="h4">{quizStats.retryAttempts}</Typography>
+              <Typography color="textSecondary" variant="small">Retry denemesi</Typography>
+            </View>
+            <View accessibilityLabel={`Genel doğruluk yüzde ${quizStats.quizAccuracy}`} style={styles.historyItem}>
+              <Typography variant="h4">%{quizStats.quizAccuracy}</Typography>
+              <Typography color="textSecondary" variant="small">Genel doğruluk</Typography>
+            </View>
+          </View>
+        ) : (
+          <View style={styles.historyNotice}>
+            <Badge variant="warning">Geçmiş quiz verisi eksik</Badge>
+            <Typography color="textSecondary" style={styles.bodyLine}>
+              Kayıtlı geçmiş bu quiz için güvenilir bir genel özet oluşturmaya yetmiyor.
+            </Typography>
+          </View>
+        )}
       </Card>
 
       <View style={styles.reviewSection}>
@@ -266,6 +320,10 @@ const styles = StyleSheet.create({
   summaryRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   summaryItem: { backgroundColor: colors.surface, borderRadius: radius.md, flexGrow: 1, gap: spacing.xxs, minWidth: 120, padding: spacing.md },
   scoreComparison: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, justifyContent: 'space-between' },
+  historyCard: { gap: spacing.lg, padding: spacing.lg },
+  historyGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  historyItem: { backgroundColor: colors.surface, borderRadius: radius.md, flexGrow: 1, gap: spacing.xxs, minWidth: 120, padding: spacing.md },
+  historyNotice: { alignItems: 'flex-start', gap: spacing.sm },
   reviewSection: { gap: spacing.md },
   reviewCard: { gap: spacing.sm, padding: spacing.lg },
   correctCard: { borderColor: colors.success },

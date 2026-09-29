@@ -48,7 +48,7 @@ describe('LessonDetailScreen progress integration', () => {
     fireEvent.press(screen.getByText('Dersi Tamamla'));
 
     await waitFor(() => expect(screen.getByText('Harika, bu dersi tamamladın.')).toBeTruthy());
-    expect(screen.getByText(`+${lessonsById['design-tokens'].completionXp} XP kazandın. Dersi istediğin zaman yeniden inceleyebilirsin.`)).toBeTruthy();
+    expect(screen.getByText('Bu ders tamamlandı. Dersi istediğin zaman yeniden okuyabilirsin; tekrar okuma XP kazandırmaz.')).toBeTruthy();
     const stateAfterFirstCompletion = useProgressStore.getState();
     expect(stateAfterFirstCompletion.totalXp).toBe(lessonsById['design-tokens'].completionXp);
     expect(stateAfterFirstCompletion.lessons[0]?.completedAt).toBe(lessonCompletedAt);
@@ -66,6 +66,7 @@ describe('LessonDetailScreen progress integration', () => {
 
   it('shows completed state without another completion action and keeps quiz routing', () => {
     useProgressStore.setState({
+      totalXp: lessonsById['design-tokens'].completionXp,
       lessons: [{ lessonId: 'design-tokens', completedAt: '2026-09-27T10:00:00.000Z' }],
     });
 
@@ -73,10 +74,30 @@ describe('LessonDetailScreen progress integration', () => {
 
     expect(screen.getByText('Harika, bu dersi tamamladın.')).toBeTruthy();
     expect(screen.queryByText('Dersi Tamamla')).toBeNull();
+    expect(useProgressStore.getState().totalXp).toBe(lessonsById['design-tokens'].completionXp);
+    expect(useProgressStore.getState().lessons[0]?.completedAt).toBe('2026-09-27T10:00:00.000Z');
     fireEvent.press(screen.getByText('Quize Geç'));
     expect(mockRouterPush).toHaveBeenCalledWith(
       '/learn/design-tokens/quiz/design-tokens-quiz',
     );
+  });
+
+  it('keeps XP and completion timestamp stable when completion is requested again', () => {
+    const completedAt = '2026-09-27T10:00:00.000Z';
+    const activityAt = '2026-09-27T11:00:00.000Z';
+    useProgressStore.setState({
+      totalXp: lessonsById['design-tokens'].completionXp,
+      lessons: [{ lessonId: 'design-tokens', completedAt }],
+      lastActivity: { type: 'lesson', lessonId: 'design-tokens', occurredAt: activityAt },
+    });
+
+    useProgressStore.getState().completeLesson('design-tokens', '2026-09-28T00:00:00.000Z');
+
+    expect(useProgressStore.getState()).toMatchObject({
+      totalXp: lessonsById['design-tokens'].completionXp,
+      lessons: [{ lessonId: 'design-tokens', completedAt }],
+      lastActivity: { type: 'lesson', lessonId: 'design-tokens', occurredAt: activityAt },
+    });
   });
 
   it('records lesson activity once for the current screen visit', async () => {

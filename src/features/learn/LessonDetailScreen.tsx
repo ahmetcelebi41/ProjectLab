@@ -196,6 +196,8 @@ function LessonActions({ completed, lesson }: { completed: boolean; lesson: Less
     if (completed) return;
 
     const progressStore = useProgressStore.getState();
+    if (isLessonCompleted(progressStore.lessons, lesson.id)) return;
+
     const occurredAt = nextActivityTimestamp(progressStore.lastActivity?.occurredAt);
     progressStore.completeLesson(lesson.id, occurredAt);
     progressStore.setLastActivity({ type: 'lesson', lessonId: lesson.id }, occurredAt);
@@ -212,7 +214,7 @@ function LessonActions({ completed, lesson }: { completed: boolean; lesson: Less
         </Typography>
         <Typography color="textSecondary" style={styles.bodyLine}>
           {completed
-            ? `+${lesson.completionXp} XP kazandın. Dersi istediğin zaman yeniden inceleyebilirsin.`
+            ? `Bu ders tamamlandı. Dersi istediğin zaman yeniden okuyabilirsin; tekrar okuma XP kazandırmaz.`
             : `Tamamladığında ${lesson.completionXp} XP kazanırsın.`}
         </Typography>
       </View>
