@@ -96,6 +96,17 @@ describe('home progress presentation', () => {
     ])).toMatchObject({ typeLabel: 'Proje', title: 'NOVA', href: '/projects/nova' });
   });
 
+  it('uses project progress as a safe Continue fallback when legacy state has no lastActivity', () => {
+    expect(getLatestContinueActivity(null, [{
+      projectId: 'nova',
+      lastVisitedAt: '2026-09-27T10:00:00.000Z',
+    }])).toMatchObject({
+      typeLabel: 'Proje',
+      title: 'NOVA',
+      href: '/projects/nova',
+    });
+  });
+
   it('uses the latest existing learning event and quiz score helper output', () => {
     expect(getLatestLearningSummary(
       [{ lessonId: 'design-tokens', completedAt: '2026-09-27T09:00:00.000Z' }],

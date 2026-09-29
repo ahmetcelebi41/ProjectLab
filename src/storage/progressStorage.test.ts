@@ -1,6 +1,14 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import { lessonsById } from '@/data/lessons';
 import { quizzesById } from '@/data/quizzes';
+import {
+  getCategoryProgress,
+  getLearningStats,
+  getQuizStats,
+} from '@/features/progress/learningStats';
+import { getLevelProgress } from '@/features/progress/level';
+import { isLessonCompleted } from '@/features/progress/lessonProgress';
 import { useProgressStore } from '@/stores/progressStore';
 import { PROGRESS_SCHEMA_VERSION, type UserProgress } from '@/types';
 
@@ -93,6 +101,130 @@ describe('progress storage migration', () => {
     expect(persisted?.version).toBe(PROGRESS_STORAGE_VERSION);
     expect(isUserProgress(persisted?.state)).toBe(true);
     expect((persisted?.state as UserProgress).totalXp).toBe(137);
+  });
+
+  it('keeps a hydrated completed lesson idempotent without changing XP or the lesson list', async () => {
+    const legacyState = {
+      totalXp: 137,
+      projects: [],
+      lessons: [
+        { lessonId: 'design-tokens', completedAt },
+        { lessonId: 'api-contracts', lastBlockId: 'request-shape' },
+      ],
+      quizzes: [],
+      earnedAchievementIds: [],
+    };
+    await writePersistedState(legacyState);
+    await useProgressStore.persist.rehydrate();
+
+    const hydrated = useProgressStore.getState();
+    const hydratedLessons = hydrated.lessons;
+    expect(isLessonCompleted(hydrated.lessons, 'design-tokens')).toBe(true);
+
+    hydrated.completeLesson('design-tokens', '2026-09-28T00:00:00.000Z');
+
+    const afterRepeat = useProgressStore.getState();
+    expect(afterRepeat.totalXp).toBe(137);
+    expect(afterRepeat.lessons).toBe(hydratedLessons);
+    expect(afterRepeat.lessons).toEqual(legacyState.lessons);
+    expect(afterRepeat.lessons.filter((item) => item.completedAt)).toHaveLength(1);
+    expect(lessonsById['design-tokens'].completionXp).toBeGreaterThan(0);
+  });
+
+  it('preserves hydrated V2 quiz history, selector values and retry XP safeguards', async () => {
+    const quiz = quizzesById['design-tokens-quiz'];
+    const fullAnswers = quiz.questions.map((question, index) => ({
+      questionId: question.id,
+      selectedOptionId: index < 2
+        ? question.correctOptionId
+        : question.options.find((option) => option.id !== question.correctOptionId)!.id,
+    }));
+    const retryAt = '2026-09-27T11:00:00.000Z';
+    const lastActivity = {
+      type: 'quiz',
+      quizId: quiz.id,
+      occurredAt: retryAt,
+    } as const;
+    const v2State = createV2State({
+      totalXp: 180,
+      projects: [{ projectId: 'nova', lastVisitedAt: '2026-09-27T09:00:00.000Z' }],
+      lessons: [{ lessonId: 'design-tokens', completedAt }],
+      quizzes: [{
+        quizId: quiz.id,
+        currentQuestionIndex: quiz.questions.length - 1,
+        answers: fullAnswers,
+        bestCorrectAnswerCount: 2,
+        awardedXp: 10,
+        completedAt,
+      }],
+      quizHistory: [{
+        quizId: quiz.id,
+        completedAt,
+        correctAnswerCount: 2,
+        questionCount: quiz.questions.length,
+        wrongQuestionIds: [quiz.questions[2].id],
+      }, {
+        quizId: quiz.id,
+        attemptType: 'retry',
+        completedAt: retryAt,
+        correctAnswerCount: 1,
+        questionCount: 1,
+        wrongQuestionIds: [],
+      }],
+      lastActivity,
+    });
+    await writePersistedState(v2State, PROGRESS_STORAGE_VERSION);
+    await useProgressStore.persist.rehydrate();
+
+    const hydrated = useProgressStore.getState();
+    const persistedSnapshot = JSON.stringify((
+      useProgressStore.persist.getOptions().partialize!(hydrated)
+    ));
+    expect(hydrated.totalXp).toBe(180);
+    expect(hydrated.lastActivity).toEqual(lastActivity);
+    expect(hydrated.quizHistory).toEqual(v2State.quizHistory);
+    expect(hydrated.quizHistory[0].attemptType).toBeUndefined();
+    expect(hydrated.quizHistory[1].attemptType).toBe('retry');
+
+    const learningStats = getLearningStats(hydrated);
+    const quizStats = getQuizStats(hydrated);
+    getCategoryProgress(hydrated);
+    expect(learningStats.xp).toBe(180);
+    expect(learningStats.level).toBe(getLevelProgress(180).level);
+    expect(learningStats.completedQuizzes).toBe(1);
+    expect(quizStats).toMatchObject({
+      fullAttempts: 1,
+      retryAttempts: 1,
+      completedQuizCount: 1,
+    });
+    expect(JSON.stringify(useProgressStore.persist.getOptions().partialize!(hydrated)))
+      .toBe(persistedSnapshot);
+
+    hydrated.saveQuizResult({
+      quizId: quiz.id,
+      currentQuestionIndex: quiz.questions.length - 1,
+      answers: fullAnswers,
+      bestCorrectAnswerCount: 2,
+      completedAt,
+    }, 'full');
+    expect(useProgressStore.getState().quizHistory).toHaveLength(2);
+
+    useProgressStore.getState().saveQuizResult({
+      quizId: quiz.id,
+      currentQuestionIndex: quiz.questions.length - 1,
+      answers: [{
+        questionId: quiz.questions[2].id,
+        selectedOptionId: quiz.questions[2].correctOptionId,
+      }],
+      bestCorrectAnswerCount: 1,
+      completedAt: '2026-09-27T12:00:00.000Z',
+    }, 'retry');
+
+    const afterRetry = useProgressStore.getState();
+    expect(afterRetry.totalXp).toBe(180);
+    expect(afterRetry.quizHistory).toHaveLength(3);
+    expect(afterRetry.quizHistory[2].attemptType).toBe('retry');
+    expect(getLearningStats(afterRetry).completedQuizzes).toBe(1);
   });
 
   it('keeps totalXp and completed quiz protection while adding missing V2 fields', () => {
