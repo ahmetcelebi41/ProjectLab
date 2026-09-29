@@ -9,6 +9,7 @@ import { Card } from '@/components/ui/Card';
 import { Progress } from '@/components/ui/Progress';
 import { Screen } from '@/components/ui/Screen';
 import { Typography } from '@/components/ui/Typography';
+import { getQuizStats } from '@/features/progress/learningStats';
 import { useProgressStore } from '@/stores/progressStore';
 import { border, colors, layout, radius, sizing, spacing } from '@/theme/tokens';
 import type { QuizAnswer, QuizQuestion } from '@/types';
@@ -224,6 +225,15 @@ export function QuizFlowScreen({ lessonId, quizId, retryAttemptAt }: Props) {
       : [],
     [quiz, retryAttempt, retryAttemptAt],
   );
+  const quizStats = useMemo(
+    () => quiz
+      ? getQuizStats({
+        quizzes: savedProgress ? [savedProgress] : [],
+        quizHistory,
+      }, [quiz])
+      : undefined,
+    [quiz, quizHistory, savedProgress],
+  );
 
   useEffect(() => {
     if (!hasHydrated || !quiz || initialized.current) return;
@@ -329,6 +339,9 @@ export function QuizFlowScreen({ lessonId, quizId, retryAttemptAt }: Props) {
   };
 
   const isLastQuestion = currentQuestionIndex === sessionQuestions.length - 1;
+  const isRetry = Boolean(retryAttemptAt);
+  const wasCompleted = Boolean(savedProgress?.completedAt)
+    || Boolean(quizStats?.completedQuizCount);
 
   return (
     <Screen
@@ -348,6 +361,47 @@ export function QuizFlowScreen({ lessonId, quizId, retryAttemptAt }: Props) {
           <Typography color="textSecondary" style={styles.bodyLine} variant="bodyLarge">{quiz.summary}</Typography>
         </View>
       </View>
+
+      <Card accessibilityLiveRegion="polite" style={styles.contextCard}>
+        <View style={styles.contextHeader}>
+          <View style={styles.copy}>
+            <Typography color="primary" variant="caption">QUIZ DURUMU</Typography>
+            <Typography accessibilityRole="header" variant="h3">
+              {isRetry
+                ? 'Yanlışlarını tekrar ediyorsun'
+                : wasCompleted
+                  ? 'Yeni bir full deneme'
+                  : 'İlk full denemen'}
+            </Typography>
+          </View>
+          <View style={styles.contextBadges}>
+            <Badge variant={wasCompleted ? 'success' : 'info'}>
+              {wasCompleted ? 'Quiz tamamlandı' : 'Henüz tamamlanmadı'}
+            </Badge>
+            <Badge variant={isRetry ? 'warning' : 'primary'}>{isRetry ? 'Retry' : 'Full'}</Badge>
+          </View>
+        </View>
+        <Typography color="textSecondary" style={styles.bodyLine}>
+          {isRetry
+            ? 'Bu retry yalnızca seçilen denemedeki yanlış soruları kapsar; tamamlanan quiz sayını ve XP’ni artırmaz.'
+            : wasCompleted
+              ? 'Bu quizi daha önce tamamladın. Bu full deneme yeni XP kazandırmaz.'
+              : 'Bu quiz henüz tamamlanmadı. İlerlemen cevaplarını kontrol ettikçe kaydedilir.'}
+        </Typography>
+        {quizStats?.hasSufficientData ? (
+          <Typography
+            accessibilityLabel={`Geçmiş performans: ${quizStats.fullAttempts} full deneme, ${quizStats.retryAttempts} retry denemesi, yüzde ${quizStats.quizAccuracy} genel doğruluk`}
+            color="textMuted"
+            variant="small"
+          >
+            Geçmiş performans: {quizStats.fullAttempts} full · {quizStats.retryAttempts} retry · %{quizStats.quizAccuracy} doğruluk
+          </Typography>
+        ) : wasCompleted ? (
+          <Typography color="textMuted" variant="small">
+            Eski kayıtlar nedeniyle güvenilir geçmiş performans özeti gösterilemiyor.
+          </Typography>
+        ) : null}
+      </Card>
 
       <Card style={styles.progressCard}>
         <View style={styles.progressHeader}>
@@ -431,6 +485,9 @@ const styles = StyleSheet.create({
   metaRow: { alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, justifyContent: 'space-between' },
   copy: { gap: spacing.xs },
   bodyLine: { lineHeight: spacing.lg },
+  contextCard: { gap: spacing.md, padding: spacing.lg },
+  contextHeader: { alignItems: 'flex-start', flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, justifyContent: 'space-between' },
+  contextBadges: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
   progressCard: { gap: spacing.md, padding: spacing.lg },
   progressHeader: { alignItems: 'center', flexDirection: 'row', gap: spacing.md, justifyContent: 'space-between' },
   questionCard: { gap: spacing.xl, padding: spacing.xl },

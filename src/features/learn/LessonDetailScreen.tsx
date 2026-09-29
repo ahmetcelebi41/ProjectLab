@@ -20,6 +20,10 @@ import { Typography } from '@/components/ui/Typography';
 import { getLessonById } from '@/data/lessons';
 import { getProjectById } from '@/data/projects';
 import { getQuizById } from '@/data/quizzes';
+import {
+  getCategoryProgress,
+  LESSON_CATEGORY_TO_V12_CATEGORY,
+} from '@/features/progress/learningStats';
 import { isLessonCompleted } from '@/features/progress/lessonProgress';
 import { useProgressStore } from '@/stores/progressStore';
 import { border, colors, layout, radius, spacing, typography } from '@/theme/tokens';
@@ -252,9 +256,10 @@ function LessonActions({ completed, lesson }: { completed: boolean; lesson: Less
 export function LessonDetailScreen({ lessonId }: Props) {
   const lesson = lessonId ? getLessonById(lessonId) : undefined;
   const hasHydrated = useProgressStore((state) => state.hasHydrated);
-  const lessonProgress = useProgressStore((state) =>
-    lesson ? state.lessons.find((item) => item.lessonId === lesson.id) : undefined,
-  );
+  const lessonProgressItems = useProgressStore((state) => state.lessons);
+  const lessonProgress = lesson
+    ? lessonProgressItems.find((item) => item.lessonId === lesson.id)
+    : undefined;
   const updateLessonProgress = useProgressStore((state) => state.updateLessonProgress);
   const blockPositions = useRef(new Map<string, BlockPosition>());
   const contentTop = useRef(0);
@@ -265,6 +270,12 @@ export function LessonDetailScreen({ lessonId }: Props) {
     if (!lesson || !lessonProgress?.lastBlockId) return -1;
     return lesson.content.findIndex((block) => block.id === lessonProgress.lastBlockId);
   }, [lesson, lessonProgress?.lastBlockId]);
+  const categoryProgress = useMemo(() => {
+    if (!lesson) return undefined;
+    const categoryId = LESSON_CATEGORY_TO_V12_CATEGORY[lesson.category];
+    return getCategoryProgress({ lessons: lessonProgressItems })
+      .find((category) => category.id === categoryId);
+  }, [lesson, lessonProgressItems]);
 
   useEffect(() => {
     blockPositions.current.clear();
@@ -349,6 +360,20 @@ export function LessonDetailScreen({ lessonId }: Props) {
           color={completed ? 'success' : 'primary'}
           value={progressValue}
         />
+        {categoryProgress ? (
+          <View style={styles.categoryProgress}>
+            <Typography color="textSecondary" variant="small">
+              {categoryProgress.name} kategori ilerlemesi
+            </Typography>
+            <Typography
+              accessibilityLabel={`${categoryProgress.name} kategorisinde ${categoryProgress.totalLessons} dersten ${categoryProgress.completedLessons} tamamlandı, yüzde ${categoryProgress.completionPercent}`}
+              color="textMuted"
+              variant="small"
+            >
+              {categoryProgress.completedLessons}/{categoryProgress.totalLessons} ders · %{categoryProgress.completionPercent}
+            </Typography>
+          </View>
+        ) : null}
       </Card>
 
       <Card raised style={styles.objectiveCard}>
@@ -417,6 +442,7 @@ const styles = StyleSheet.create({
   tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
   progressCard: { gap: spacing.md, padding: spacing.lg },
   progressHeader: { alignItems: 'center', flexDirection: 'row', gap: spacing.md, justifyContent: 'space-between' },
+  categoryProgress: { alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, justifyContent: 'space-between' },
   sectionCopy: { flex: 1, gap: spacing.xs },
   objectiveCard: { borderColor: colors.primary, gap: spacing.sm, padding: spacing.lg },
   content: { gap: spacing.xl },

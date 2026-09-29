@@ -1,6 +1,7 @@
 import { fireEvent, render } from '@testing-library/react-native';
 
 import { designTokensQuiz } from '@/data/quizzes';
+import { getLearningStats } from '@/features/progress/learningStats';
 import { getQuizAwardXp } from '@/features/progress/rewards';
 import { useProgressStore } from '@/stores/progressStore';
 import { PROGRESS_SCHEMA_VERSION } from '@/types';
@@ -56,6 +57,8 @@ describe('QuizFlowScreen retry session', () => {
       <QuizFlowScreen lessonId="design-tokens" quizId="design-tokens-quiz" />,
     );
 
+    expect(screen.getByText('İlk full denemen')).toBeTruthy();
+    expect(screen.getByText('Henüz tamamlanmadı')).toBeTruthy();
     fireEvent.press(screen.getByLabelText('Görsel kararları anlamlı isimlerle merkezileştirmek'));
     fireEvent.press(screen.getByText('Cevabı Kontrol Et'));
     fireEvent.press(screen.getByText('Sonraki Soru'));
@@ -89,6 +92,10 @@ describe('QuizFlowScreen retry session', () => {
     );
 
     expect(screen.getByText('1 soru · Yanlış tekrar')).toBeTruthy();
+    expect(screen.getByText('Yanlışlarını tekrar ediyorsun')).toBeTruthy();
+    expect(screen.getByText('Quiz tamamlandı')).toBeTruthy();
+    expect(screen.getByText('Bu retry yalnızca seçilen denemedeki yanlış soruları kapsar; tamamlanan quiz sayını ve XP’ni artırmaz.')).toBeTruthy();
+    expect(screen.getByLabelText('Geçmiş performans: 1 full deneme, 0 retry denemesi, yüzde 67 genel doğruluk')).toBeTruthy();
     expect(screen.getByText(designTokensQuiz.questions[2].prompt)).toBeTruthy();
     expect(screen.queryByText(designTokensQuiz.questions[0].prompt)).toBeNull();
     expect(screen.getByLabelText('Seçili cevabı kontrol et').props.accessibilityState.disabled)
@@ -107,6 +114,7 @@ describe('QuizFlowScreen retry session', () => {
       questionCount: 1,
       wrongQuestionIds: [],
     });
+    expect(getLearningStats(state).completedQuizzes).toBe(1);
     expect(mockRouterReplace).toHaveBeenCalledWith(
       '/learn/design-tokens/quiz/design-tokens-quiz/result',
     );
@@ -118,6 +126,8 @@ describe('QuizFlowScreen retry session', () => {
     );
 
     expect(screen.getByText('3 soru')).toBeTruthy();
+    expect(screen.getByText('Yeni bir full deneme')).toBeTruthy();
+    expect(screen.getByText('Bu quizi daha önce tamamladın. Bu full deneme yeni XP kazandırmaz.')).toBeTruthy();
     expect(screen.queryByText('+10 XP')).toBeNull();
     expect(screen.getByText(designTokensQuiz.questions[0].prompt)).toBeTruthy();
     expect(screen.getByLabelText('Seçili cevabı kontrol et').props.accessibilityState.disabled)
@@ -142,5 +152,18 @@ describe('QuizFlowScreen retry session', () => {
       questionCount: 3,
       wrongQuestionIds: [],
     });
+  });
+
+  it('keeps legacy completion context neutral when reliable history is missing', () => {
+    useProgressStore.setState({ quizHistory: [] });
+
+    const screen = render(
+      <QuizFlowScreen lessonId="design-tokens" quizId="design-tokens-quiz" />,
+    );
+
+    expect(screen.getByText('Quiz tamamlandı')).toBeTruthy();
+    expect(screen.getByText('Yeni bir full deneme')).toBeTruthy();
+    expect(screen.getByText('Eski kayıtlar nedeniyle güvenilir geçmiş performans özeti gösterilemiyor.')).toBeTruthy();
+    expect(screen.queryByText(/Geçmiş performans:/)).toBeNull();
   });
 });

@@ -43,11 +43,14 @@ describe('LessonDetailScreen progress integration', () => {
     const screen = render(<LessonDetailScreen lessonId="design-tokens" />);
 
     expect(screen.getByText('Dersi Tamamla')).toBeTruthy();
+    expect(screen.getByText('UI/UX kategori ilerlemesi')).toBeTruthy();
+    expect(screen.getByText('0/2 ders · %0')).toBeTruthy();
     expect(useProgressStore.getState().lastActivity?.occurredAt).toBe(lessonOpenedAt);
 
     fireEvent.press(screen.getByText('Dersi Tamamla'));
 
     await waitFor(() => expect(screen.getByText('Harika, bu dersi tamamladın.')).toBeTruthy());
+    expect(screen.getByText('1/2 ders · %50')).toBeTruthy();
     expect(screen.getByText('Bu ders tamamlandı. Dersi istediğin zaman yeniden okuyabilirsin; tekrar okuma XP kazandırmaz.')).toBeTruthy();
     const stateAfterFirstCompletion = useProgressStore.getState();
     expect(stateAfterFirstCompletion.totalXp).toBe(lessonsById['design-tokens'].completionXp);
