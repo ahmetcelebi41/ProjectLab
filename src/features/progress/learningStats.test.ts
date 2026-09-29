@@ -39,7 +39,7 @@ function attempt(overrides: Partial<QuizAttempt> = {}): QuizAttempt {
 }
 
 describe('getLearningStats', () => {
-  it('derives completion, XP, level and the latest project/content activity', () => {
+  it('derives V1.2 completion, attempt, XP, level and latest activity fields', () => {
     const result = getLearningStats(progress({
       totalXp: 20,
       lessons: [
@@ -65,11 +65,16 @@ describe('getLearningStats', () => {
 
     expect(result).toEqual({
       completedLessons: 1,
-      totalLessons: lessons.length,
+      totalLessons: 3,
+      lessonCompletionPercent: 33,
       lessonCompletionRate: 33,
       completedQuizzes: 1,
-      totalQuizzes: quizzes.length,
+      totalQuizzes: 3,
+      quizCompletionPercent: 33,
       quizCompletionRate: 33,
+      totalQuizAttempts: 1,
+      fullAttempts: 1,
+      retryAttempts: 0,
       xp: 20,
       level: 3,
       lastActivity: {
@@ -115,13 +120,67 @@ describe('getLearningStats', () => {
     expect(getLearningStats(progress(), { lessons: [], projects: [], quizzes: [] })).toEqual({
       completedLessons: 0,
       totalLessons: 0,
+      lessonCompletionPercent: 0,
       lessonCompletionRate: 0,
       completedQuizzes: 0,
       totalQuizzes: 0,
+      quizCompletionPercent: 0,
       quizCompletionRate: 0,
+      totalQuizAttempts: 0,
+      fullAttempts: 0,
+      retryAttempts: 0,
       xp: 0,
       level: 1,
       lastActivity: null,
+    });
+  });
+
+  it('does not let retry attempts complete a quiz and keeps existing completion behavior', () => {
+    const result = getLearningStats(progress({
+      quizzes: [{
+        quizId: 'api-contracts-quiz',
+        currentQuestionIndex: 2,
+        answers: [],
+        bestCorrectAnswerCount: 2,
+        completedAt: firstCompletedAt,
+      }],
+      quizHistory: [
+        attempt({
+          quizId: 'design-tokens-quiz',
+          attemptType: 'retry',
+          completedAt: retryCompletedAt,
+        }),
+        attempt({
+          quizId: 'product-taxonomy-quiz',
+          completedAt: '2026-09-27T12:00:00.000Z',
+        }),
+      ],
+    }));
+
+    expect(result).toMatchObject({
+      completedQuizzes: 2,
+      quizCompletionPercent: 67,
+      quizCompletionRate: 67,
+      totalQuizAttempts: 2,
+      fullAttempts: 1,
+      retryAttempts: 1,
+    });
+  });
+
+  it('keeps XP and level calculation independent from selector-derived attempt stats', () => {
+    const withoutHistory = getLearningStats(progress({ totalXp: 20 }));
+    const withHistory = getLearningStats(progress({
+      totalXp: 20,
+      quizHistory: [attempt(), attempt({
+        attemptType: 'retry',
+        completedAt: retryCompletedAt,
+      })],
+    }));
+
+    expect(withHistory).toMatchObject({ xp: 20, level: 3 });
+    expect({ xp: withHistory.xp, level: withHistory.level }).toEqual({
+      xp: withoutHistory.xp,
+      level: withoutHistory.level,
     });
   });
 });
@@ -152,10 +211,91 @@ describe('getCategoryProgress', () => {
     }), duplicateCatalog);
 
     expect(result).toEqual([
-      { category: 'ui-ux', label: 'UI/UX', completedLessons: 1, totalLessons: 2, completionRate: 50 },
-      { category: 'frontend', label: 'Frontend', completedLessons: 0, totalLessons: 0, completionRate: 0 },
-      { category: 'backend', label: 'Backend', completedLessons: 1, totalLessons: 1, completionRate: 100 },
-      { category: 'devops', label: 'DevOps', completedLessons: 0, totalLessons: 0, completionRate: 0 },
+      {
+        id: 'ui-ux',
+        name: 'UI/UX',
+        category: 'ui-ux',
+        label: 'UI/UX',
+        completedLessons: 1,
+        totalLessons: 2,
+        completionPercent: 50,
+        completionRate: 50,
+      },
+      {
+        id: 'frontend',
+        name: 'Frontend',
+        category: 'frontend',
+        label: 'Frontend',
+        completedLessons: 0,
+        totalLessons: 0,
+        completionPercent: 0,
+        completionRate: 0,
+      },
+      {
+        id: 'backend',
+        name: 'Backend',
+        category: 'backend',
+        label: 'Backend',
+        completedLessons: 1,
+        totalLessons: 1,
+        completionPercent: 100,
+        completionRate: 100,
+      },
+      {
+        id: 'devops',
+        name: 'DevOps',
+        category: 'devops',
+        label: 'DevOps',
+        completedLessons: 0,
+        totalLessons: 0,
+        completionPercent: 0,
+        completionRate: 0,
+      },
+    ]);
+  });
+
+  it('returns every category id/name with safe zero totals for an empty catalog', () => {
+    expect(getCategoryProgress(progress(), [])).toEqual([
+      {
+        id: 'ui-ux',
+        name: 'UI/UX',
+        category: 'ui-ux',
+        label: 'UI/UX',
+        completedLessons: 0,
+        totalLessons: 0,
+        completionPercent: 0,
+        completionRate: 0,
+      },
+      {
+        id: 'frontend',
+        name: 'Frontend',
+        category: 'frontend',
+        label: 'Frontend',
+        completedLessons: 0,
+        totalLessons: 0,
+        completionPercent: 0,
+        completionRate: 0,
+      },
+      {
+        id: 'backend',
+        name: 'Backend',
+        category: 'backend',
+        label: 'Backend',
+        completedLessons: 0,
+        totalLessons: 0,
+        completionPercent: 0,
+        completionRate: 0,
+      },
+      {
+        id: 'devops',
+        name: 'DevOps',
+        category: 'devops',
+        label: 'DevOps',
+        completedLessons: 0,
+        totalLessons: 0,
+        completionPercent: 0,
+        completionRate: 0,
+      },
     ]);
   });
 });
@@ -181,9 +321,11 @@ describe('getQuizStats', () => {
     }));
 
     expect(result).toEqual({
+      totalAttempts: 3,
       quizAttempts: 3,
       fullAttempts: 2,
       retryAttempts: 1,
+      completedQuizCount: 1,
       totalCorrect: 6,
       totalQuestions: 8,
       quizAccuracy: 75,
@@ -196,6 +338,70 @@ describe('getQuizStats', () => {
       historyStatus: 'complete',
       hasSufficientData: true,
       incompleteQuizIds: [],
+    });
+  });
+
+  it('counts only unique quizzes with a full attempt as completed', () => {
+    const result = getQuizStats(progress({
+      quizHistory: [
+        attempt(),
+        attempt({
+          completedAt: retryCompletedAt,
+          correctAnswerCount: 3,
+          wrongQuestionIds: [],
+        }),
+        attempt({
+          quizId: 'api-contracts-quiz',
+          attemptType: undefined,
+          completedAt: '2026-09-27T12:00:00.000Z',
+        }),
+        attempt({
+          quizId: 'product-taxonomy-quiz',
+          attemptType: 'retry',
+          completedAt: '2026-09-27T13:00:00.000Z',
+        }),
+      ],
+    }));
+
+    expect(result).toMatchObject({
+      totalAttempts: 4,
+      fullAttempts: 3,
+      retryAttempts: 1,
+      completedQuizCount: 2,
+      historyStatus: 'incomplete-history',
+      incompleteQuizIds: ['product-taxonomy-quiz'],
+    });
+  });
+
+  it('separates first full-attempt accuracy from retry accuracy', () => {
+    const result = getQuizStats(progress({
+      quizHistory: [
+        attempt({ correctAnswerCount: 1, questionCount: 2 }),
+        attempt({
+          completedAt: retryCompletedAt,
+          correctAnswerCount: 2,
+          questionCount: 2,
+          wrongQuestionIds: [],
+        }),
+        attempt({
+          attemptType: 'retry',
+          completedAt: '2026-09-27T12:00:00.000Z',
+          correctAnswerCount: 3,
+          questionCount: 4,
+        }),
+      ],
+    }));
+
+    expect(result).toMatchObject({
+      totalAttempts: 3,
+      fullAttempts: 2,
+      retryAttempts: 1,
+      firstAttemptCorrect: 1,
+      firstAttemptQuestions: 2,
+      firstAttemptAccuracy: 50,
+      retryCorrect: 3,
+      retryQuestions: 4,
+      retryAccuracy: 75,
     });
   });
 
@@ -262,9 +468,11 @@ describe('getQuizStats', () => {
     const result = getQuizStats(progress({ quizHistory: invalidAttempts }));
 
     expect(result).toEqual({
+      totalAttempts: 0,
       quizAttempts: 0,
       fullAttempts: 0,
       retryAttempts: 0,
+      completedQuizCount: 0,
       totalCorrect: 0,
       totalQuestions: 0,
       quizAccuracy: null,
@@ -278,5 +486,51 @@ describe('getQuizStats', () => {
       hasSufficientData: false,
       incompleteQuizIds: [],
     });
+  });
+});
+
+describe('selector regressions', () => {
+  it('does not mutate persisted/store-shaped state or content inputs', () => {
+    const source = progress({
+      totalXp: 20,
+      projects: [{ projectId: 'nova', lastVisitedAt: retryCompletedAt }],
+      lessons: [{ lessonId: 'design-tokens', completedAt: firstCompletedAt }],
+      quizzes: [{
+        quizId: 'design-tokens-quiz',
+        currentQuestionIndex: 2,
+        answers: [],
+        bestCorrectAnswerCount: 2,
+        completedAt: firstCompletedAt,
+      }],
+      quizHistory: [attempt()],
+      lastActivity: {
+        type: 'lesson',
+        lessonId: 'design-tokens',
+        occurredAt: firstCompletedAt,
+      },
+    });
+    const sourceSnapshot = JSON.stringify(source);
+    const lessonsSnapshot = JSON.stringify(lessons);
+    const quizzesSnapshot = JSON.stringify(quizzes);
+
+    getLearningStats(source);
+    getCategoryProgress(source);
+    getQuizStats(source);
+
+    expect(JSON.stringify(source)).toBe(sourceSnapshot);
+    expect(JSON.stringify(lessons)).toBe(lessonsSnapshot);
+    expect(JSON.stringify(quizzes)).toBe(quizzesSnapshot);
+  });
+
+  it('returns deterministic values for repeated calls with the same state', () => {
+    const source = progress({
+      totalXp: 20,
+      lessons: [{ lessonId: 'design-tokens', completedAt: firstCompletedAt }],
+      quizHistory: [attempt()],
+    });
+
+    expect(getLearningStats(source)).toEqual(getLearningStats(source));
+    expect(getCategoryProgress(source)).toEqual(getCategoryProgress(source));
+    expect(getQuizStats(source)).toEqual(getQuizStats(source));
   });
 });

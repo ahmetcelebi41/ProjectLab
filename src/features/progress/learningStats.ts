@@ -25,10 +25,17 @@ export type LatestActivity =
 export type LearningStats = Readonly<{
   completedLessons: number;
   totalLessons: number;
+  lessonCompletionPercent: number;
+  /** @deprecated Use lessonCompletionPercent. */
   lessonCompletionRate: number;
   completedQuizzes: number;
   totalQuizzes: number;
+  quizCompletionPercent: number;
+  /** @deprecated Use quizCompletionPercent. */
   quizCompletionRate: number;
+  totalQuizAttempts: number;
+  fullAttempts: number;
+  retryAttempts: number;
   xp: number;
   level: number;
   lastActivity: LatestActivity | null;
@@ -55,19 +62,28 @@ export const LESSON_CATEGORY_TO_V12_CATEGORY = {
 } as const satisfies Readonly<Record<LessonCategory, V12LearningCategory>>;
 
 export type CategoryProgress = Readonly<{
+  id: V12LearningCategory;
+  name: string;
+  /** @deprecated Use id. */
   category: V12LearningCategory;
+  /** @deprecated Use name. */
   label: string;
   completedLessons: number;
   totalLessons: number;
+  completionPercent: number;
+  /** @deprecated Use completionPercent. */
   completionRate: number;
 }>;
 
 export type QuizHistoryStatus = 'no-data' | 'complete' | 'incomplete-history';
 
 export type QuizStats = Readonly<{
+  totalAttempts: number;
+  /** @deprecated Use totalAttempts. */
   quizAttempts: number;
   fullAttempts: number;
   retryAttempts: number;
+  completedQuizCount: number;
   totalCorrect: number;
   totalQuestions: number;
   quizAccuracy: number | null;
@@ -202,15 +218,23 @@ export function getLearningStats(
     progress.quizHistory,
     content.quizzes,
   ).size;
+  const quizStats = getQuizStats(progress, content.quizzes);
   const xp = Number.isFinite(progress.totalXp) ? Math.max(0, progress.totalXp) : 0;
+  const lessonCompletionPercent = percentage(completedLessons, totalLessons);
+  const quizCompletionPercent = percentage(completedQuizzes, totalQuizzes);
 
   return {
     completedLessons,
     totalLessons,
-    lessonCompletionRate: percentage(completedLessons, totalLessons),
+    lessonCompletionPercent,
+    lessonCompletionRate: lessonCompletionPercent,
     completedQuizzes,
     totalQuizzes,
-    quizCompletionRate: percentage(completedQuizzes, totalQuizzes),
+    quizCompletionPercent,
+    quizCompletionRate: quizCompletionPercent,
+    totalQuizAttempts: quizStats.totalAttempts,
+    fullAttempts: quizStats.fullAttempts,
+    retryAttempts: quizStats.retryAttempts,
     xp,
     level: getLevelProgress(xp).level,
     lastActivity: getLatestActivity(progress.lastActivity, progress.projects, content),
@@ -233,13 +257,17 @@ export function getCategoryProgress(
     const completedLessons = categoryLessons.filter((lesson) => (
       completedLessonIds.has(lesson.id)
     )).length;
+    const completionPercent = percentage(completedLessons, categoryLessons.length);
 
     return {
+      id,
+      name: label,
       category: id,
       label,
       completedLessons,
       totalLessons: categoryLessons.length,
-      completionRate: percentage(completedLessons, categoryLessons.length),
+      completionPercent,
+      completionRate: completionPercent,
     };
   });
 }
@@ -320,9 +348,11 @@ export function getQuizStats(
       : 'no-data';
 
   return {
+    totalAttempts: attempts.length,
     quizAttempts: attempts.length,
     fullAttempts: full.length,
     retryAttempts: retry.length,
+    completedQuizCount: fullQuizIds.size,
     totalCorrect: totalScore.correct,
     totalQuestions: totalScore.questions,
     quizAccuracy: accuracy(totalScore.correct, totalScore.questions),
