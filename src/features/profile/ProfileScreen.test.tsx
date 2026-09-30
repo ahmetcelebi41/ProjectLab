@@ -80,6 +80,42 @@ describe('ProfileScreen V1.2 learning stats', () => {
     expect(screen.queryByText('technical-question-id')).toBeNull();
   });
 
+  it('separates preserved quiz completion from unavailable legacy full-attempt history', () => {
+    setProgress({
+      quizzes: [
+        {
+          quizId: 'design-tokens-quiz',
+          currentQuestionIndex: 2,
+          answers: [],
+          bestCorrectAnswerCount: 2,
+          completedAt: '2026-09-26T11:00:00.000Z',
+        },
+        {
+          quizId: 'api-contracts-quiz',
+          currentQuestionIndex: 2,
+          answers: [],
+          bestCorrectAnswerCount: 2,
+          completedAt: '2026-09-26T12:00:00.000Z',
+        },
+        {
+          quizId: 'product-taxonomy-quiz',
+          currentQuestionIndex: 2,
+          answers: [],
+          bestCorrectAnswerCount: 2,
+          completedAt: '2026-09-26T13:00:00.000Z',
+        },
+      ],
+      quizHistory: [],
+    });
+    const screen = render(<ProfileScreen />);
+
+    expect(screen.getByLabelText('Quiz ilerlemesi yüzde 100')).toBeTruthy();
+    expect(screen.getByText('3 / 3 · %100')).toBeTruthy();
+    expect(screen.getByLabelText('Full attempt: 0')).toBeTruthy();
+    expect(screen.getByLabelText('Toplam attempt: 0')).toBeTruthy();
+    expect(screen.getByLabelText('Geçmiş quiz verisi eksik')).toBeTruthy();
+  });
+
   it('uses selector category mapping for the four V1.2 groups', () => {
     setProgress({
       lessons: [

@@ -131,7 +131,7 @@ describe('HomeScreen V1.2 progress integration', () => {
     expect(screen.getAllByText('%33')).toHaveLength(2);
   });
 
-  it('does not present legacy quiz attempts as completed quizzes', () => {
+  it('keeps history-only quiz attempts separate from completion as an edge case', () => {
     setProgress({
       totalXp: 120,
       lessons: [
@@ -169,6 +169,47 @@ describe('HomeScreen V1.2 progress integration', () => {
       'Öğrenme özeti: 3/3 ders, yüzde 100; 0/3 quiz, yüzde 0',
     )).toBeTruthy();
     expect(screen.getByLabelText('Quiz ilerlemesi yüzde 0')).toBeTruthy();
+  });
+
+  it('shows preserved V1.0 quiz completions even when V1.1 attempt history is empty', () => {
+    setProgress({
+      totalXp: 120,
+      lessons: [
+        { lessonId: 'design-tokens', completedAt: '2026-09-26T08:00:00.000Z' },
+        { lessonId: 'api-contracts', completedAt: '2026-09-26T09:00:00.000Z' },
+        { lessonId: 'product-taxonomy', completedAt: '2026-09-26T10:00:00.000Z' },
+      ],
+      quizzes: [
+        {
+          quizId: 'design-tokens-quiz',
+          currentQuestionIndex: 2,
+          answers: [],
+          bestCorrectAnswerCount: 2,
+          completedAt: '2026-09-26T11:00:00.000Z',
+        },
+        {
+          quizId: 'api-contracts-quiz',
+          currentQuestionIndex: 2,
+          answers: [],
+          bestCorrectAnswerCount: 2,
+          completedAt: '2026-09-26T12:00:00.000Z',
+        },
+        {
+          quizId: 'product-taxonomy-quiz',
+          currentQuestionIndex: 2,
+          answers: [],
+          bestCorrectAnswerCount: 2,
+          completedAt: '2026-09-26T13:00:00.000Z',
+        },
+      ],
+      quizHistory: [],
+    });
+    const screen = render(<HomeScreen />);
+
+    expect(screen.getByLabelText(
+      'Öğrenme özeti: 3/3 ders, yüzde 100; 3/3 quiz, yüzde 100',
+    )).toBeTruthy();
+    expect(screen.getByLabelText('Quiz ilerlemesi yüzde 100')).toBeTruthy();
   });
 
   it('falls back from an invalid learning date to a valid project visit', () => {

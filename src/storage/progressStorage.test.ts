@@ -103,7 +103,7 @@ describe('progress storage migration', () => {
     expect((persisted?.state as UserProgress).totalXp).toBe(137);
   });
 
-  it('keeps V1.1 legacy attempts without turning them into canonical quiz completions', async () => {
+  it('keeps history-only legacy attempts separate from canonical completion as an edge case', async () => {
     const projects = [
       { projectId: 'elora', lastVisitedAt: '2026-09-26T08:00:00.000Z' },
       { projectId: 'nova', lastVisitedAt: '2026-09-26T09:00:00.000Z' },
@@ -198,6 +198,85 @@ describe('progress storage migration', () => {
     expect(hydrated.lessons).toEqual(lessons);
     expect(hydrated.quizzes).toEqual(quizzes);
     expect(hydrated.earnedAchievementIds).toEqual(earnedAchievementIds);
+  });
+
+  it('preserves V1.0 quiz completions while V1.1 attempt history remains unavailable', async () => {
+    const legacyState = {
+      totalXp: 120,
+      projects: [
+        { projectId: 'elora', lastVisitedAt: '2026-09-26T08:00:00.000Z' },
+        { projectId: 'nova', lastVisitedAt: '2026-09-26T09:00:00.000Z' },
+        { projectId: 'moonphase', lastVisitedAt: '2026-09-26T10:00:00.000Z' },
+      ],
+      lessons: [
+        { lessonId: 'design-tokens', completedAt },
+        { lessonId: 'api-contracts', completedAt },
+        { lessonId: 'product-taxonomy', completedAt },
+      ],
+      quizzes: [
+        {
+          quizId: 'design-tokens-quiz',
+          currentQuestionIndex: 2,
+          answers: [],
+          bestCorrectAnswerCount: 2,
+          completedAt: '2026-09-26T11:00:00.000Z',
+        },
+        {
+          quizId: 'api-contracts-quiz',
+          currentQuestionIndex: 2,
+          answers: [],
+          bestCorrectAnswerCount: 2,
+          completedAt: '2026-09-26T12:00:00.000Z',
+        },
+        {
+          quizId: 'product-taxonomy-quiz',
+          currentQuestionIndex: 2,
+          answers: [],
+          bestCorrectAnswerCount: 2,
+          completedAt: '2026-09-26T13:00:00.000Z',
+        },
+      ],
+      earnedAchievementIds: [
+        'first-project',
+        'project-explorer',
+        'first-lesson',
+        'lesson-collector',
+        'first-quiz',
+      ],
+    };
+    await writePersistedState(legacyState, 2);
+
+    await useProgressStore.persist.rehydrate();
+
+    const hydrated = useProgressStore.getState();
+    const learningStats = getLearningStats(hydrated);
+    const quizStats = getQuizStats(hydrated);
+    expect(hydrated.quizHistory).toEqual([]);
+    expect(learningStats).toMatchObject({
+      completedLessons: 3,
+      lessonCompletionPercent: 100,
+      completedQuizzes: 3,
+      quizCompletionPercent: 100,
+      xp: 120,
+      level: 13,
+    });
+    expect(quizStats).toMatchObject({
+      completedQuizCount: 3,
+      totalAttempts: 0,
+      fullAttempts: 0,
+      retryAttempts: 0,
+      historyStatus: 'incomplete-history',
+    });
+    expect(hydrated.projects).toEqual(legacyState.projects);
+    expect(hydrated.lessons).toEqual(legacyState.lessons);
+    expect(hydrated.earnedAchievementIds).toEqual(legacyState.earnedAchievementIds);
+    expect(hydrated.quizzes.map(({ completedAt: quizCompletedAt, quizId }) => ({
+      completedAt: quizCompletedAt,
+      quizId,
+    }))).toEqual(legacyState.quizzes.map(({ completedAt: quizCompletedAt, quizId }) => ({
+      completedAt: quizCompletedAt,
+      quizId,
+    })));
   });
 
   it('keeps a hydrated completed lesson idempotent without changing XP or the lesson list', async () => {
