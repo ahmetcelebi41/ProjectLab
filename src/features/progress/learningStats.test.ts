@@ -53,6 +53,12 @@ describe('getLearningStats', () => {
         answers: [],
         bestCorrectAnswerCount: 2,
         completedAt: firstCompletedAt,
+      }, {
+        quizId: 'design-tokens-quiz',
+        currentQuestionIndex: 2,
+        answers: [],
+        bestCorrectAnswerCount: 2,
+        completedAt: retryCompletedAt,
       }],
       quizHistory: [attempt()],
       lastActivity: {
@@ -135,7 +141,7 @@ describe('getLearningStats', () => {
     });
   });
 
-  it('does not let retry attempts complete a quiz and keeps existing completion behavior', () => {
+  it('uses only canonical quiz progress for completion while preserving attempt totals', () => {
     const result = getLearningStats(progress({
       quizzes: [{
         quizId: 'api-contracts-quiz',
@@ -158,9 +164,9 @@ describe('getLearningStats', () => {
     }));
 
     expect(result).toMatchObject({
-      completedQuizzes: 2,
-      quizCompletionPercent: 67,
-      quizCompletionRate: 67,
+      completedQuizzes: 1,
+      quizCompletionPercent: 33,
+      quizCompletionRate: 33,
       totalQuizAttempts: 2,
       fullAttempts: 1,
       retryAttempts: 1,
@@ -325,7 +331,7 @@ describe('getQuizStats', () => {
       quizAttempts: 3,
       fullAttempts: 2,
       retryAttempts: 1,
-      completedQuizCount: 1,
+      completedQuizCount: 0,
       totalCorrect: 6,
       totalQuestions: 8,
       quizAccuracy: 75,
@@ -341,7 +347,7 @@ describe('getQuizStats', () => {
     });
   });
 
-  it('counts only unique quizzes with a full attempt as completed', () => {
+  it('keeps history-only full attempts separate from canonical completion', () => {
     const result = getQuizStats(progress({
       quizHistory: [
         attempt(),
@@ -367,7 +373,7 @@ describe('getQuizStats', () => {
       totalAttempts: 4,
       fullAttempts: 3,
       retryAttempts: 1,
-      completedQuizCount: 2,
+      completedQuizCount: 0,
       historyStatus: 'incomplete-history',
       incompleteQuizIds: ['product-taxonomy-quiz'],
     });

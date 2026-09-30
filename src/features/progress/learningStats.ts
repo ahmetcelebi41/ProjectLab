@@ -188,22 +188,14 @@ function getCompletedLessonIds(
 
 function getCompletedQuizIds(
   progress: readonly QuizProgress[],
-  history: readonly QuizAttempt[],
   quizCatalog: readonly Quiz[],
 ): ReadonlySet<QuizId> {
   const knownQuizIds = uniqueIds(quizCatalog.map((quiz) => quiz.id));
-  const completedIds = new Set(
+  return new Set(
     progress
       .filter((item) => knownQuizIds.has(item.quizId) && isCompleted(item.completedAt))
       .map((item) => item.quizId),
   );
-
-  uniqueValidAttempts(history, quizCatalog).forEach((attempt) => {
-    if (attempt.attemptType !== 'retry') {
-      completedIds.add(attempt.quizId);
-    }
-  });
-  return completedIds;
 }
 
 export function getLearningStats(
@@ -215,7 +207,6 @@ export function getLearningStats(
   const completedLessons = getCompletedLessonIds(progress.lessons, content.lessons).size;
   const completedQuizzes = getCompletedQuizIds(
     progress.quizzes,
-    progress.quizHistory,
     content.quizzes,
   ).size;
   const quizStats = getQuizStats(progress, content.quizzes);
@@ -328,16 +319,9 @@ export function getQuizStats(
   const totalScore = sumAttempts(attempts);
   const firstScore = sumAttempts([...firstFullByQuiz.values()]);
   const retryScore = sumAttempts(retry);
-  const knownQuizIds = uniqueIds(quizCatalog.map((quiz) => quiz.id));
   const fullQuizIds = uniqueIds(full.map((attempt) => attempt.quizId));
-  const completedOrRetriedQuizIds = new Set<QuizId>(
-    progress.quizzes
-      .filter((item) => (
-        knownQuizIds.has(item.quizId)
-        && isCompleted(item.completedAt)
-      ))
-      .map((item) => item.quizId),
-  );
+  const completedQuizIds = getCompletedQuizIds(progress.quizzes, quizCatalog);
+  const completedOrRetriedQuizIds = new Set<QuizId>(completedQuizIds);
   retry.forEach((attempt) => completedOrRetriedQuizIds.add(attempt.quizId));
   const incompleteQuizIds = [...completedOrRetriedQuizIds]
     .filter((quizId) => !fullQuizIds.has(quizId));
@@ -352,7 +336,7 @@ export function getQuizStats(
     quizAttempts: attempts.length,
     fullAttempts: full.length,
     retryAttempts: retry.length,
-    completedQuizCount: fullQuizIds.size,
+    completedQuizCount: completedQuizIds.size,
     totalCorrect: totalScore.correct,
     totalQuestions: totalScore.questions,
     quizAccuracy: accuracy(totalScore.correct, totalScore.questions),

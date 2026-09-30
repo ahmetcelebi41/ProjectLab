@@ -131,6 +131,46 @@ describe('HomeScreen V1.2 progress integration', () => {
     expect(screen.getAllByText('%33')).toHaveLength(2);
   });
 
+  it('does not present legacy quiz attempts as completed quizzes', () => {
+    setProgress({
+      totalXp: 120,
+      lessons: [
+        { lessonId: 'design-tokens', completedAt: '2026-09-26T08:00:00.000Z' },
+        { lessonId: 'api-contracts', completedAt: '2026-09-26T09:00:00.000Z' },
+        { lessonId: 'product-taxonomy', completedAt: '2026-09-26T10:00:00.000Z' },
+      ],
+      quizHistory: [
+        {
+          quizId: 'design-tokens-quiz',
+          completedAt: '2026-09-26T11:00:00.000Z',
+          correctAnswerCount: 2,
+          questionCount: 3,
+          wrongQuestionIds: ['design-token-question-3'],
+        },
+        {
+          quizId: 'api-contracts-quiz',
+          completedAt: '2026-09-26T12:00:00.000Z',
+          correctAnswerCount: 2,
+          questionCount: 3,
+          wrongQuestionIds: ['api-contract-question-3'],
+        },
+        {
+          quizId: 'product-taxonomy-quiz',
+          completedAt: '2026-09-26T13:00:00.000Z',
+          correctAnswerCount: 2,
+          questionCount: 3,
+          wrongQuestionIds: ['product-taxonomy-question-3'],
+        },
+      ],
+    });
+    const screen = render(<HomeScreen />);
+
+    expect(screen.getByLabelText(
+      'Öğrenme özeti: 3/3 ders, yüzde 100; 0/3 quiz, yüzde 0',
+    )).toBeTruthy();
+    expect(screen.getByLabelText('Quiz ilerlemesi yüzde 0')).toBeTruthy();
+  });
+
   it('falls back from an invalid learning date to a valid project visit', () => {
     setProgress({
       lastActivity: {

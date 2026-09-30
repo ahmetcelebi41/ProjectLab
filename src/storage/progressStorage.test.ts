@@ -103,6 +103,103 @@ describe('progress storage migration', () => {
     expect((persisted?.state as UserProgress).totalXp).toBe(137);
   });
 
+  it('keeps V1.1 legacy attempts without turning them into canonical quiz completions', async () => {
+    const projects = [
+      { projectId: 'elora', lastVisitedAt: '2026-09-26T08:00:00.000Z' },
+      { projectId: 'nova', lastVisitedAt: '2026-09-26T09:00:00.000Z' },
+      { projectId: 'moonphase', lastVisitedAt: '2026-09-26T10:00:00.000Z' },
+    ] as const;
+    const lessons = [
+      { lessonId: 'design-tokens', completedAt },
+      { lessonId: 'api-contracts', completedAt },
+      { lessonId: 'product-taxonomy', completedAt },
+    ] as const;
+    const quizzes = [
+      {
+        quizId: 'design-tokens-quiz',
+        currentQuestionIndex: 1,
+        answers: [],
+        bestCorrectAnswerCount: 0,
+      },
+      {
+        quizId: 'api-contracts-quiz',
+        currentQuestionIndex: 1,
+        answers: [],
+        bestCorrectAnswerCount: 0,
+      },
+      {
+        quizId: 'product-taxonomy-quiz',
+        currentQuestionIndex: 1,
+        answers: [],
+        bestCorrectAnswerCount: 0,
+      },
+    ] as const;
+    const quizHistory = [
+      {
+        quizId: 'design-tokens-quiz',
+        completedAt: '2026-09-26T11:00:00.000Z',
+        correctAnswerCount: 2,
+        questionCount: 3,
+        wrongQuestionIds: ['design-token-question-3'],
+      },
+      {
+        quizId: 'api-contracts-quiz',
+        completedAt: '2026-09-26T12:00:00.000Z',
+        correctAnswerCount: 2,
+        questionCount: 3,
+        wrongQuestionIds: ['api-contract-question-3'],
+      },
+      {
+        quizId: 'product-taxonomy-quiz',
+        completedAt: '2026-09-26T13:00:00.000Z',
+        correctAnswerCount: 2,
+        questionCount: 3,
+        wrongQuestionIds: ['product-taxonomy-question-3'],
+      },
+    ] as const;
+    const earnedAchievementIds = [
+      'first-project',
+      'project-explorer',
+      'first-lesson',
+      'lesson-collector',
+      'first-quiz',
+    ] as const;
+    const v11State = createV2State({
+      totalXp: 120,
+      projects,
+      lessons,
+      quizzes,
+      quizHistory,
+      earnedAchievementIds,
+    });
+    await writePersistedState(v11State, PROGRESS_STORAGE_VERSION);
+
+    await useProgressStore.persist.rehydrate();
+
+    const hydrated = useProgressStore.getState();
+    const learningStats = getLearningStats(hydrated);
+    const quizStats = getQuizStats(hydrated);
+    expect(hydrated.quizHistory).toEqual(quizHistory);
+    expect(learningStats).toMatchObject({
+      completedLessons: 3,
+      lessonCompletionPercent: 100,
+      completedQuizzes: 0,
+      quizCompletionPercent: 0,
+      xp: 120,
+      level: 13,
+    });
+    expect(quizStats).toMatchObject({
+      completedQuizCount: 0,
+      totalAttempts: 3,
+      fullAttempts: 3,
+      retryAttempts: 0,
+    });
+    expect(hydrated.projects).toEqual(projects);
+    expect(hydrated.lessons).toEqual(lessons);
+    expect(hydrated.quizzes).toEqual(quizzes);
+    expect(hydrated.earnedAchievementIds).toEqual(earnedAchievementIds);
+  });
+
   it('keeps a hydrated completed lesson idempotent without changing XP or the lesson list', async () => {
     const legacyState = {
       totalXp: 137,
