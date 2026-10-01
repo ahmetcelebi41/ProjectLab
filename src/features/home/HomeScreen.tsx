@@ -9,9 +9,12 @@ import { Card } from '@/components/ui/Card';
 import { Progress } from '@/components/ui/Progress';
 import { Screen } from '@/components/ui/Screen';
 import { Typography } from '@/components/ui/Typography';
+import { ActivityList } from '@/features/activity/ActivityList';
 import { achievementsById, lessons, projects } from '@/data';
 import {
+  getActivityStats,
   getLearningStats,
+  getOverallProgress,
   type LearningStats,
 } from '@/features/progress/learningStats';
 import { getCompletedProjectStageIds } from '@/features/progress/projectProgress';
@@ -103,13 +106,30 @@ function LoadingHome() {
   );
 }
 
-function LearningOverview({ compact, stats }: { compact: boolean; stats: LearningStats }) {
+function LearningOverview({
+  compact,
+  last7DaysActivityCount,
+  overallProgress,
+  stats,
+}: {
+  compact: boolean;
+  last7DaysActivityCount: number;
+  overallProgress: number;
+  stats: LearningStats;
+}) {
   return (
     <Card
       accessibilityLabel={`Öğrenme özeti: ${stats.completedLessons}/${stats.totalLessons} ders, yüzde ${stats.lessonCompletionPercent}; ${stats.completedQuizzes}/${stats.totalQuizzes} quiz, yüzde ${stats.quizCompletionPercent}`}
       style={styles.overviewCard}
     >
       <View style={styles.overviewTopRow}>
+        <View
+          accessibilityLabel={`Genel ilerleme yüzde ${overallProgress}`}
+          style={[styles.overviewItem, compact && styles.overviewItemCompact]}
+        >
+          <Typography color="textSecondary" variant="caption">GENEL İLERLEME</Typography>
+          <Typography variant="h3">%{overallProgress}</Typography>
+        </View>
         <View style={[styles.overviewItem, compact && styles.overviewItemCompact]}>
           <Typography color="textSecondary" variant="caption">DERSLER</Typography>
           <Typography variant="h3">
@@ -119,6 +139,10 @@ function LearningOverview({ compact, stats }: { compact: boolean; stats: Learnin
         <View style={[styles.overviewItem, compact && styles.overviewItemCompact]}>
           <Typography color="textSecondary" variant="caption">DERS İLERLEMESİ</Typography>
           <Typography variant="h3">%{stats.lessonCompletionPercent}</Typography>
+        </View>
+        <View style={[styles.overviewItem, compact && styles.overviewItemCompact]}>
+          <Typography color="textSecondary" variant="caption">SON 7 GÜN</Typography>
+          <Typography variant="h3">{last7DaysActivityCount} aktivite</Typography>
         </View>
         <View style={[styles.overviewItem, compact && styles.overviewItemCompact]}>
           <Typography color="textSecondary" variant="caption">QUIZLER</Typography>
@@ -132,6 +156,10 @@ function LearningOverview({ compact, stats }: { compact: boolean; stats: Learnin
         </View>
       </View>
       <View style={styles.overviewProgressList}>
+        <Progress
+          accessibilityLabel={`Genel ilerleme yüzde ${overallProgress}`}
+          value={overallProgress}
+        />
         <Progress
           accessibilityLabel={`Ders ilerlemesi yüzde ${stats.lessonCompletionPercent}`}
           value={stats.lessonCompletionPercent}
@@ -365,6 +393,7 @@ export function HomeScreen() {
   const quizProgress = useProgressStore((state) => state.quizzes);
   const quizHistory = useProgressStore((state) => state.quizHistory);
   const lastActivity = useProgressStore((state) => state.lastActivity);
+  const activityHistory = useProgressStore((state) => state.activityHistory);
 
   const horizontalPadding = width >= breakpoints.medium
     ? layout.horizontalPadding.wide.min
@@ -392,6 +421,11 @@ export function HomeScreen() {
     totalXp,
   }), [lastActivity, lessonProgress, projectProgress, quizHistory, quizProgress, totalXp]);
   const learningStats = useMemo(() => getLearningStats(progressSource), [progressSource]);
+  const overallProgress = useMemo(() => getOverallProgress(progressSource), [progressSource]);
+  const activityStats = useMemo(
+    () => getActivityStats({ activityHistory }),
+    [activityHistory],
+  );
   const continueActivity = getContinueActivity(learningStats.lastActivity);
   const latestLearning = getLatestLearningSummary(lessonProgress, quizHistory);
 
@@ -425,13 +459,27 @@ export function HomeScreen() {
       </View>
 
       <View style={styles.section}>
-        <SectionHeading title="Öğrenme Özeti" />
-        <LearningOverview compact={width < breakpoints.medium} stats={learningStats} />
+        <SectionHeading title="Kaldığın Yerden Devam Et" />
+        {continueActivity ? <ContinueCard activity={continueActivity} /> : <StartCard />}
       </View>
 
       <View style={styles.section}>
-        <SectionHeading title="Kaldığın Yerden Devam Et" />
-        {continueActivity ? <ContinueCard activity={continueActivity} /> : <StartCard />}
+        <SectionHeading title="İlerleme Özeti" />
+        <LearningOverview
+          compact={width < breakpoints.medium}
+          last7DaysActivityCount={activityStats.last7DaysActivityCount}
+          overallProgress={overallProgress}
+          stats={learningStats}
+        />
+      </View>
+
+      <View style={styles.section}>
+        <SectionHeading title="Son Aktivite" actionLabel="Tümünü Gör" href="/profile/activity" />
+        <ActivityList
+          emptyMessage="İlk anlamlı ilerleme kaydın burada görünecek."
+          events={activityHistory}
+          limit={1}
+        />
       </View>
 
       <View style={styles.section}>

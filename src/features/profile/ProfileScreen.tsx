@@ -8,6 +8,7 @@ import { Card } from '@/components/ui/Card';
 import { Progress } from '@/components/ui/Progress';
 import { Screen } from '@/components/ui/Screen';
 import { Typography } from '@/components/ui/Typography';
+import { ActivityList } from '@/features/activity/ActivityList';
 import {
   achievements,
   lessonsById,
@@ -17,9 +18,12 @@ import {
 } from '@/data';
 import { getLevelProgress, XP_PER_LEVEL } from '@/features/progress/level';
 import {
+  getActivityStats,
   getCategoryProgress,
   getLearningStats,
+  getProjectStats,
   getQuizStats,
+  type ActivityStats,
   type LearningStats,
   type LatestActivity,
   type QuizStats,
@@ -328,6 +332,37 @@ function LastActivityCard({ activity }: { activity: LatestActivity | null }) {
   );
 }
 
+function ActivitySummary({ stats }: { stats: ActivityStats }) {
+  const quizEvents = stats.eventTypeCounts.quiz_completed + stats.eventTypeCounts.quiz_retry;
+
+  return (
+    <Card
+      accessibilityLabel={`Aktivite özeti: toplam ${stats.totalActivities}, son 7 gün ${stats.last7DaysActivityCount}`}
+      style={styles.statsCard}
+    >
+      <Typography accessibilityRole="header" variant="h4">Aktivite Özeti</Typography>
+      <View style={styles.activityMetrics}>
+        <View style={styles.activityMetric}>
+          <Typography variant="h3">{stats.last7DaysActivityCount}</Typography>
+          <Typography color="textSecondary" variant="small">Son 7 gün</Typography>
+        </View>
+        <View style={styles.activityMetric}>
+          <Typography variant="h3">{stats.eventTypeCounts.lesson_completed}</Typography>
+          <Typography color="textSecondary" variant="small">Tamamlanan ders</Typography>
+        </View>
+        <View style={styles.activityMetric}>
+          <Typography variant="h3">{quizEvents}</Typography>
+          <Typography color="textSecondary" variant="small">Quiz aktivitesi</Typography>
+        </View>
+        <View style={styles.activityMetric}>
+          <Typography variant="h3">{stats.eventTypeCounts.project_progress}</Typography>
+          <Typography color="textSecondary" variant="small">Proje ilerlemesi</Typography>
+        </View>
+      </View>
+    </Card>
+  );
+}
+
 function ProjectProgressCard({ progress, project, width }: {
   progress?: ProjectProgress;
   project: Project;
@@ -408,6 +443,7 @@ export function ProfileScreen() {
   const quizProgress = useProgressStore((state) => state.quizzes);
   const quizHistory = useProgressStore((state) => state.quizHistory);
   const lastActivity = useProgressStore((state) => state.lastActivity);
+  const activityHistory = useProgressStore((state) => state.activityHistory);
   const earnedAchievementIds = useProgressStore((state) => state.earnedAchievementIds);
 
   if (!hasHydrated) return <LoadingProfile />;
@@ -442,13 +478,15 @@ export function ProfileScreen() {
   const learningStats = getLearningStats(progressSource);
   const categoryProgress = getCategoryProgress(progressSource);
   const quizStats = getQuizStats(progressSource);
-  const completedProjectCount = projects.filter(
-    (project) => getCompletedStageCount(project) === project.stages.length,
-  ).length;
+  const projectStats = getProjectStats();
+  const activityStats = getActivityStats({ activityHistory });
+  const completedProjectCount = projectStats.completedProjects;
   const earnedIds = new Set<string>(earnedAchievementIds);
   const metrics: readonly Metric[] = [
-    { label: 'Toplam proje', value: String(projects.length) },
+    { label: 'Toplam proje', value: String(projectStats.totalProjects) },
     { label: 'Tamamlanan proje', value: String(completedProjectCount) },
+    { label: 'Tamamlanan ders', value: String(learningStats.completedLessons) },
+    { label: 'Tamamlanan quiz', value: String(learningStats.completedQuizzes) },
     { label: 'Kazanılan başarım', value: `${earnedIds.size} / ${achievements.length}` },
   ];
 
@@ -478,6 +516,22 @@ export function ProfileScreen() {
         </View>
         <CategoryProgressCard categories={categoryProgress} />
         <LastActivityCard activity={learningStats.lastActivity} />
+        <ActivitySummary stats={activityStats} />
+        <View style={styles.activitySection}>
+          <SectionHeading
+            description="Tamamlanan ders, quiz ve proje adımlarının en güncel kayıtları."
+            title="Son Aktiviteler"
+          />
+          <ActivityList events={activityHistory} limit={3} />
+          <Button
+            accessibilityLabel="Tüm aktiviteleri aç"
+            onPress={() => navigate('/profile/activity')}
+            size="large"
+            variant="secondary"
+          >
+            Tümünü Gör
+          </Button>
+        </View>
         <Card style={styles.domainCard}>
           <DomainProgress
             completed={completedProjectCount}
@@ -550,6 +604,22 @@ const styles = StyleSheet.create({
   },
   sectionHeading: {
     gap: spacing.xs,
+  },
+  activitySection: {
+    gap: spacing.md,
+  },
+  activityMetrics: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  activityMetric: {
+    backgroundColor: colors.surfaceRaised,
+    borderRadius: radius.md,
+    flexGrow: 1,
+    gap: spacing.xxs,
+    minWidth: 120,
+    padding: spacing.md,
   },
   bodyLine: {
     lineHeight: spacing.lg,

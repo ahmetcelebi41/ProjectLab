@@ -171,6 +171,14 @@ function LearningSummary({ stats }: { stats: LearningStats }) {
           <Typography color="textMuted" variant="caption">Mevcut seviye</Typography>
           <Typography variant="h4">Seviye {stats.level}</Typography>
         </View>
+        <View style={styles.summaryMetric}>
+          <Typography color="textMuted" variant="caption">Quiz denemesi</Typography>
+          <Typography variant="h4">{stats.totalQuizAttempts}</Typography>
+        </View>
+        <View style={styles.summaryMetric}>
+          <Typography color="textMuted" variant="caption">Quiz tekrarı</Typography>
+          <Typography variant="h4">{stats.retryAttempts}</Typography>
+        </View>
       </View>
     </Card>
   );

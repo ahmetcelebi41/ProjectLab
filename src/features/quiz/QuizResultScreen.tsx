@@ -115,7 +115,11 @@ export function QuizResultScreen({ lessonId, quizId }: Props) {
   const awardedXp = lastAttempt.attemptType !== 'retry' && firstFullAttempt === lastAttempt
     ? savedProgress.awardedXp ?? 0
     : 0;
-  const attemptTypeLabel = lastAttempt.attemptType === 'retry' ? 'Retry' : 'Full';
+  const attemptTypeLabel = lastAttempt.attemptType === 'retry'
+    ? 'Tekrar'
+    : firstFullAttempt === lastAttempt
+      ? 'İlk tamamlama'
+      : 'Tam çözüm';
   const quizPath = `/learn/${quiz.lessonId}/quiz/${quiz.id}`;
 
   return (
@@ -141,7 +145,7 @@ export function QuizResultScreen({ lessonId, quizId }: Props) {
         <View style={styles.scoreTop}>
           <View style={styles.scoreCopy}>
             <Typography color="textMuted" variant="caption">
-              {lastAttempt.attemptType === 'retry' ? 'RETRY SONUCU' : 'FULL QUIZ SONUCU'}
+              {lastAttempt.attemptType === 'retry' ? 'TEKRAR SONUCU' : 'TAM QUIZ SONUCU'}
             </Typography>
             <Typography accessibilityLabel={`Yüzde ${lastScore.score}`} style={styles.percentage} variant="displayCompact">
               %{lastScore.score}
@@ -201,13 +205,13 @@ export function QuizResultScreen({ lessonId, quizId }: Props) {
               <Typography variant="h4">{quizStats.quizAttempts}</Typography>
               <Typography color="textSecondary" variant="small">Toplam deneme</Typography>
             </View>
-            <View accessibilityLabel={`Full deneme ${quizStats.fullAttempts}`} style={styles.historyItem}>
+            <View accessibilityLabel={`Tam çözüm ${quizStats.fullAttempts}`} style={styles.historyItem}>
               <Typography variant="h4">{quizStats.fullAttempts}</Typography>
-              <Typography color="textSecondary" variant="small">Full deneme</Typography>
+              <Typography color="textSecondary" variant="small">Tam çözüm</Typography>
             </View>
-            <View accessibilityLabel={`Retry denemesi ${quizStats.retryAttempts}`} style={styles.historyItem}>
+            <View accessibilityLabel={`Tekrar denemesi ${quizStats.retryAttempts}`} style={styles.historyItem}>
               <Typography variant="h4">{quizStats.retryAttempts}</Typography>
-              <Typography color="textSecondary" variant="small">Retry denemesi</Typography>
+              <Typography color="textSecondary" variant="small">Tekrar denemesi</Typography>
             </View>
             <View accessibilityLabel={`Genel doğruluk yüzde ${quizStats.quizAccuracy}`} style={styles.historyItem}>
               <Typography variant="h4">%{quizStats.quizAccuracy}</Typography>

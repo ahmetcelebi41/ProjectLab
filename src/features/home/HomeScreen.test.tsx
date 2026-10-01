@@ -20,13 +20,14 @@ function setProgress(overrides: Partial<ReturnType<typeof useProgressStore.getSt
     quizzes: [],
     quizHistory: [],
     lastActivity: null,
+    activityHistory: [],
     earnedAchievementIds: [],
     hasHydrated: true,
     ...overrides,
   });
 }
 
-describe('HomeScreen V1.2 progress integration', () => {
+describe('HomeScreen V1.3 progress integration', () => {
   beforeEach(() => {
     mockRouterPush.mockClear();
     setProgress();
@@ -91,6 +92,29 @@ describe('HomeScreen V1.2 progress integration', () => {
     expect(screen.getByLabelText('Ana öneri: Proje, NOVA')).toBeTruthy();
     fireEvent.press(screen.getByText('Projeye devam et'));
     expect(mockRouterPush).toHaveBeenCalledWith('/projects/nova');
+  });
+
+  it('keeps Continue on lastActivity while showing activity history separately', () => {
+    setProgress({
+      lastActivity: {
+        type: 'lesson',
+        lessonId: 'design-tokens',
+        occurredAt: '2026-09-27T09:00:00.000Z',
+      },
+      activityHistory: [{
+        id: 'newer-project-event',
+        type: 'project_progress',
+        entityId: 'nova',
+        timestamp: Date.parse('2026-09-28T10:00:00.000Z'),
+      }],
+    });
+
+    const screen = render(<HomeScreen />);
+
+    expect(screen.getByLabelText('Ana öneri: Ders, Design Token ile Tutarlı Arayüz')).toBeTruthy();
+    expect(screen.getByText('Projede ilerleme kaydedildi')).toBeTruthy();
+    fireEvent.press(screen.getByText('Derse devam et'));
+    expect(mockRouterPush).toHaveBeenCalledWith('/learn/design-tokens');
   });
 
   it('falls back to the existing start action for an invalid activity target', () => {

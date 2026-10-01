@@ -22,13 +22,14 @@ function setProgress(overrides: Partial<ReturnType<typeof useProgressStore.getSt
     quizzes: [],
     quizHistory: [],
     lastActivity: null,
+    activityHistory: [],
     earnedAchievementIds: [],
     hasHydrated: true,
     ...overrides,
   });
 }
 
-describe('LearnScreen V1.2 progress integration', () => {
+describe('LearnScreen V1.3 progress integration', () => {
   beforeEach(() => {
     mockRouterPush.mockClear();
     setProgress();
@@ -82,6 +83,33 @@ describe('LearnScreen V1.2 progress integration', () => {
     expect(screen.getByLabelText('DevOps ilerlemesi yüzde 0')).toBeTruthy();
     fireEvent.press(screen.getByLabelText('API Contract Tasarlamak dersine devam et'));
     expect(mockRouterPush).toHaveBeenCalledWith('/learn/api-contracts');
+  });
+
+  it('shows full and retry attempt totals from learning stats', () => {
+    setProgress({
+      quizHistory: [{
+        quizId: 'design-tokens-quiz',
+        attemptType: 'full',
+        completedAt,
+        correctAnswerCount: 2,
+        questionCount: 3,
+        wrongQuestionIds: ['safe-change'],
+      }, {
+        quizId: 'design-tokens-quiz',
+        attemptType: 'retry',
+        completedAt: '2026-09-29T11:00:00.000Z',
+        correctAnswerCount: 1,
+        questionCount: 1,
+        wrongQuestionIds: [],
+      }],
+    });
+
+    const screen = render(<LearnScreen />);
+
+    expect(screen.getByText('Quiz denemesi')).toBeTruthy();
+    expect(screen.getByText('Quiz tekrarı')).toBeTruthy();
+    expect(screen.getByText('2')).toBeTruthy();
+    expect(screen.getByText('1')).toBeTruthy();
   });
 
   it('does not render duplicate completions above the category total', () => {

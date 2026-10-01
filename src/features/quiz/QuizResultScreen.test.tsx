@@ -50,6 +50,7 @@ function setCompletedQuiz(history: readonly QuizAttempt[], awardedXp = 10) {
     }],
     quizHistory: history,
     lastActivity: null,
+    activityHistory: [],
     earnedAchievementIds: [],
     hasHydrated: true,
   });
@@ -79,8 +80,8 @@ describe('QuizResultScreen attempt details', () => {
     expect(screen.getByText('+0 XP')).toBeTruthy();
     expect(screen.getByLabelText('Toplam deneme 2')).toBeTruthy();
     expect(screen.getByText('Toplam deneme')).toBeTruthy();
-    expect(screen.getByText('Full deneme')).toBeTruthy();
-    expect(screen.getByText('Retry denemesi')).toBeTruthy();
+    expect(screen.getByLabelText('Tam çözüm 2')).toBeTruthy();
+    expect(screen.getByLabelText('Tekrar denemesi 0')).toBeTruthy();
     expect(screen.getByText('Genel doğruluk')).toBeTruthy();
 
     const historyBeforeRerender = useProgressStore.getState().quizHistory;
@@ -114,7 +115,7 @@ describe('QuizResultScreen attempt details', () => {
     expect(screen.getByText('Tüm soruları doğru yanıtladın. Öğren’e dönerek sıradaki konuya geçebilirsin.')).toBeTruthy();
     expect(screen.getByLabelText('Yüzde 100')).toBeTruthy();
     expect(screen.getByText('+40 XP')).toBeTruthy();
-    expect(screen.getByText('Full')).toBeTruthy();
+    expect(screen.getByText('İlk tamamlama')).toBeTruthy();
     expect(screen.getByText('3/3')).toBeTruthy();
     expect(screen.getByText('Quiz durumu')).toBeTruthy();
     expect(screen.getByText('Tamamlandı')).toBeTruthy();
@@ -152,14 +153,14 @@ describe('QuizResultScreen attempt details', () => {
       <QuizResultScreen lessonId="design-tokens" quizId="design-tokens-quiz" />,
     );
 
-    expect(screen.getByText('RETRY SONUCU')).toBeTruthy();
+    expect(screen.getByText('TEKRAR SONUCU')).toBeTruthy();
     expect(screen.getByLabelText('Yüzde 100')).toBeTruthy();
     expect(screen.getByText('Son tam quiz: 2/3')).toBeTruthy();
     expect(screen.getByText('En iyi tam quiz: 2/3')).toBeTruthy();
     expect(screen.getByLabelText('Soru 3, doğru')).toBeTruthy();
     expect(screen.queryByLabelText('Soru 1, doğru')).toBeNull();
     expect(screen.getByText('+0 XP')).toBeTruthy();
-    expect(screen.getByText('Retry')).toBeTruthy();
+    expect(screen.getByText('Tekrar')).toBeTruthy();
     expect(screen.getByText('1/1')).toBeTruthy();
   });
 
@@ -217,7 +218,7 @@ describe('QuizResultScreen attempt details', () => {
       <QuizResultScreen lessonId="design-tokens" quizId="design-tokens-quiz" />,
     );
 
-    expect(screen.getByText('Retry')).toBeTruthy();
+    expect(screen.getByText('Tekrar')).toBeTruthy();
     expect(screen.getByText('+0 XP')).toBeTruthy();
     expect(screen.getByText('Geçmiş quiz verisi eksik')).toBeTruthy();
     expect(screen.queryByText('Genel doğruluk')).toBeNull();
@@ -232,6 +233,7 @@ describe('QuizResultScreen attempt details', () => {
       quizzes: [],
       quizHistory: [],
       lastActivity: null,
+      activityHistory: [],
       earnedAchievementIds: [],
       hasHydrated: true,
     });

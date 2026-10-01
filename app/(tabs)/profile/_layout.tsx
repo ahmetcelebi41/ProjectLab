@@ -4,6 +4,7 @@ import { stackScreenOptions } from '@/components/shared/stackOptions';
 export default function ProfileLayout() {
   return <Stack screenOptions={stackScreenOptions}>
     <Stack.Screen name="index" options={{ title: 'Profil' }} />
+    <Stack.Screen name="activity" options={{ title: 'Aktiviteler' }} />
     <Stack.Screen name="progress" options={{ title: 'İlerlemem' }} />
     <Stack.Screen name="achievements" options={{ title: 'Başarımlar' }} />
     <Stack.Screen name="settings" options={{ title: 'Ayarlar' }} />

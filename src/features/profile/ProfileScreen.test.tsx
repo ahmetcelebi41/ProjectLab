@@ -1,11 +1,15 @@
-import { render } from '@testing-library/react-native';
+import { fireEvent, render } from '@testing-library/react-native';
 
 import { useProgressStore } from '@/stores/progressStore';
 import { PROGRESS_SCHEMA_VERSION } from '@/types';
 
 import { ProfileScreen } from './ProfileScreen';
 
-jest.mock('expo-router', () => ({ router: { push: jest.fn() } }));
+const mockRouterPush = jest.fn();
+
+jest.mock('expo-router', () => ({
+  router: { push: (...args: unknown[]) => mockRouterPush(...args) },
+}));
 
 const completedAt = '2026-09-27T10:00:00.000Z';
 
@@ -18,14 +22,18 @@ function setProgress(overrides: Partial<ReturnType<typeof useProgressStore.getSt
     quizzes: [],
     quizHistory: [],
     lastActivity: null,
+    activityHistory: [],
     earnedAchievementIds: [],
     hasHydrated: true,
     ...overrides,
   });
 }
 
-describe('ProfileScreen V1.2 learning stats', () => {
-  beforeEach(() => setProgress());
+describe('ProfileScreen V1.3 progress integration', () => {
+  beforeEach(() => {
+    mockRouterPush.mockClear();
+    setProgress();
+  });
 
   it('renders existing profile features and safe zero-data states', () => {
     const screen = render(<ProfileScreen />);
@@ -37,9 +45,34 @@ describe('ProfileScreen V1.2 learning stats', () => {
     expect(screen.getByText('Veri yetersiz')).toBeTruthy();
     expect(screen.getByText('Henüz quiz performans verisi yok.')).toBeTruthy();
     expect(screen.getByText('Henüz aktivite yok.')).toBeTruthy();
+    expect(screen.getByText('Henüz aktivite kaydı yok.')).toBeTruthy();
     expect(screen.queryByText(/NaN|Infinity/)).toBeNull();
     expect(screen.getByText('Başarımlar')).toBeTruthy();
     expect(screen.getByLabelText('Kazanılan başarım: 0 / 6')).toBeTruthy();
+  });
+
+  it('shows selector-backed activity stats, recent events and the history entry point', () => {
+    const recent = Date.now() - 60_000;
+    setProgress({
+      activityHistory: [
+        { id: 'lesson', type: 'lesson_completed', entityId: 'design-tokens', timestamp: recent - 1 },
+        {
+          id: 'retry',
+          type: 'quiz_retry',
+          entityId: 'design-tokens-quiz',
+          timestamp: recent,
+          metadata: { correctAnswerCount: 1, questionCount: 1 },
+        },
+      ],
+    });
+
+    const screen = render(<ProfileScreen />);
+
+    expect(screen.getByLabelText('Aktivite özeti: toplam 2, son 7 gün 2')).toBeTruthy();
+    expect(screen.getByText('Quiz tekrarlandı')).toBeTruthy();
+    expect(screen.getByText('Ders tamamlandı')).toBeTruthy();
+    fireEvent.press(screen.getByLabelText('Tüm aktiviteleri aç'));
+    expect(mockRouterPush).toHaveBeenCalledWith('/profile/activity');
   });
 
   it('shows lesson and quiz completion plus weighted quiz performance', () => {
