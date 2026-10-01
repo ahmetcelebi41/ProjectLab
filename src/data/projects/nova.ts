@@ -16,7 +16,7 @@ export const novaProject = {
   featured: true,
   portfolioVisible: true,
   updatedAt: '2026-09-24',
-  currentStageId: 'development',
+  currentStageId: 'release',
   stages: [
     {
       id: 'planning',
@@ -38,23 +38,23 @@ export const novaProject = {
       id: 'development',
       order: 3,
       title: 'Modül Geliştirme',
-      summary: 'Dashboard ve temel operasyon modülleri geliştiriliyor.',
-      status: 'in-progress',
+      summary: 'Dashboard ve temel operasyon modülleri tamamlandı.',
+      status: 'completed',
       problem: 'Farklı operasyonların aynı veri modelini güvenli biçimde paylaşması gerekiyor.',
-      solution: 'Modüller ortak API contract’ları üzerinden bağlanıyor.',
+      solution: 'Modüller ortak API contract’ları üzerinden bağlandı.',
     },
     {
       id: 'release',
       order: 4,
       title: 'Test ve Yayın',
-      summary: 'Üretim öncesi doğrulama ve yayın aşaması henüz başlamadı.',
-      status: 'not-started',
+      summary: 'Üretim öncesi doğrulama ve yayın aşaması tamamlandı.',
+      status: 'completed',
     },
   ],
   lessonIds: ['api-contracts'],
   quizIds: ['api-contracts-quiz'],
   result: {
-    summary: 'Aktif geliştirme sürümü temel operasyonları ortak bir panelde yönetebilir durumda.',
+    summary: 'Tamamlanan sürüm temel operasyonları ortak bir panelde yönetebilir durumda.',
     highlights: ['Sipariş yönetimi', 'Stok takibi', 'Müşteri kayıtları', 'API tabanlı mimari'],
   },
 } as const satisfies Project;

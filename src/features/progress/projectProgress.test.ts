@@ -6,7 +6,15 @@ describe('project progress helpers', () => {
   const project = projectsById.nova;
 
   it('journey durumunu yalnız statik proje aşamalarından türetir', () => {
-    expect(getCompletedProjectStageIds(project)).toEqual(['planning', 'architecture']);
-    expect(getActiveProjectStageId(project)).toBe('development');
+    expect(getCompletedProjectStageIds(project)).toEqual([
+      'planning',
+      'architecture',
+      'development',
+      'release',
+    ]);
+    expect(getActiveProjectStageId(project)).toBe('release');
+    expect(Math.round(
+      (getCompletedProjectStageIds(project).length / project.stages.length) * 100,
+    )).toBe(100);
   });
 });

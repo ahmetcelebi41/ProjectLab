@@ -1,10 +1,13 @@
-import { lessons, quizzes } from '@/data';
+import { lessons, projects, quizzes } from '@/data';
 import type { Lesson, QuizAttempt, UserProgress } from '@/types';
 import { PROGRESS_SCHEMA_VERSION } from '@/types';
 
 import {
+  getActivityStats,
   getCategoryProgress,
   getLearningStats,
+  getOverallProgress,
+  getProjectStats,
   getQuizStats,
   LESSON_CATEGORY_TO_V12_CATEGORY,
 } from './learningStats';
@@ -496,6 +499,123 @@ describe('getQuizStats', () => {
   });
 });
 
+describe('getProjectStats', () => {
+  it('derives project statuses and the stage-weighted progress summary', () => {
+    expect(getProjectStats()).toEqual({
+      totalProjects: 3,
+      completedProjects: 2,
+      inProgressProjects: 1,
+      completedStages: 9,
+      totalStages: 12,
+      projectProgressPercent: 75,
+    });
+  });
+
+  it('deduplicates projects and stages and safely handles an empty catalog', () => {
+    expect(getProjectStats([
+      projects[0],
+      { ...projects[0], stages: [...projects[0].stages, projects[0].stages[0]] },
+      projects[1],
+    ])).toEqual({
+      totalProjects: 2,
+      completedProjects: 2,
+      inProgressProjects: 0,
+      completedStages: 8,
+      totalStages: 8,
+      projectProgressPercent: 100,
+    });
+
+    expect(getProjectStats([])).toEqual({
+      totalProjects: 0,
+      completedProjects: 0,
+      inProgressProjects: 0,
+      completedStages: 0,
+      totalStages: 0,
+      projectProgressPercent: 0,
+    });
+  });
+});
+
+describe('getActivityStats', () => {
+  const localNow = new Date(2026, 9, 1, 12).getTime();
+  const sevenDayBoundary = new Date(2026, 8, 25, 0).getTime();
+
+  it('counts the last seven local calendar days inclusively and groups event types', () => {
+    const result = getActivityStats({
+      activityHistory: [
+        { id: 'at-boundary', type: 'lesson_completed', entityId: 'a', timestamp: sevenDayBoundary },
+        { id: 'before-boundary', type: 'quiz_completed', entityId: 'b', timestamp: sevenDayBoundary - 1 },
+        { id: 'retry', type: 'quiz_retry', entityId: 'c', timestamp: localNow },
+        { id: 'future', type: 'project_progress', entityId: 'd', timestamp: localNow + 1 },
+      ],
+    }, localNow);
+
+    expect(result).toEqual({
+      totalActivities: 4,
+      last7DaysActivityCount: 2,
+      eventTypeCounts: {
+        lesson_completed: 1,
+        quiz_completed: 1,
+        quiz_retry: 1,
+        project_progress: 1,
+      },
+      last7DaysEventTypeCounts: {
+        lesson_completed: 1,
+        quiz_completed: 0,
+        quiz_retry: 1,
+        project_progress: 0,
+      },
+    });
+  });
+
+  it('handles missing history and ignores invalid numeric timestamps', () => {
+    expect(getActivityStats({}, localNow)).toEqual({
+      totalActivities: 0,
+      last7DaysActivityCount: 0,
+      eventTypeCounts: {
+        lesson_completed: 0,
+        quiz_completed: 0,
+        quiz_retry: 0,
+        project_progress: 0,
+      },
+      last7DaysEventTypeCounts: {
+        lesson_completed: 0,
+        quiz_completed: 0,
+        quiz_retry: 0,
+        project_progress: 0,
+      },
+    });
+
+    expect(getActivityStats({
+      activityHistory: [{
+        id: 'invalid',
+        type: 'lesson_completed',
+        entityId: 'a',
+        timestamp: Number.NaN,
+      }],
+    }, localNow).totalActivities).toBe(0);
+  });
+});
+
+describe('getOverallProgress', () => {
+  it('combines completed lessons, quizzes and project stages as completion units', () => {
+    expect(getOverallProgress(progress({
+      lessons: [{ lessonId: 'design-tokens', completedAt: firstCompletedAt }],
+      quizzes: [{
+        quizId: 'design-tokens-quiz',
+        currentQuestionIndex: 2,
+        answers: [],
+        bestCorrectAnswerCount: 2,
+        completedAt: firstCompletedAt,
+      }],
+    }))).toBe(61);
+  });
+
+  it('returns zero for empty data and content', () => {
+    expect(getOverallProgress(progress(), { lessons: [], projects: [], quizzes: [] })).toBe(0);
+  });
+});
+
 describe('selector regressions', () => {
   it('does not mutate persisted/store-shaped state or content inputs', () => {
     const source = progress({
@@ -523,6 +643,9 @@ describe('selector regressions', () => {
     getLearningStats(source);
     getCategoryProgress(source);
     getQuizStats(source);
+    getProjectStats();
+    getActivityStats(source, Date.parse(retryCompletedAt));
+    getOverallProgress(source);
 
     expect(JSON.stringify(source)).toBe(sourceSnapshot);
     expect(JSON.stringify(lessons)).toBe(lessonsSnapshot);
@@ -539,5 +662,8 @@ describe('selector regressions', () => {
     expect(getLearningStats(source)).toEqual(getLearningStats(source));
     expect(getCategoryProgress(source)).toEqual(getCategoryProgress(source));
     expect(getQuizStats(source)).toEqual(getQuizStats(source));
+    expect(getProjectStats()).toEqual(getProjectStats());
+    expect(getActivityStats(source, 0)).toEqual(getActivityStats(source, 0));
+    expect(getOverallProgress(source)).toEqual(getOverallProgress(source));
   });
 });

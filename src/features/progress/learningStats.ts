@@ -2,6 +2,8 @@ import { lessons, projects, quizzes } from '@/data';
 import { getLevelProgress } from '@/features/progress/level';
 import { isSameQuizCompletionEvent } from '@/features/quiz/quizAttempts';
 import type {
+  ActivityEvent,
+  ActivityEventType,
   LastActivity,
   Lesson,
   LessonCategory,
@@ -98,6 +100,24 @@ export type QuizStats = Readonly<{
   incompleteQuizIds: readonly QuizId[];
 }>;
 
+export type ProjectStats = Readonly<{
+  totalProjects: number;
+  completedProjects: number;
+  inProgressProjects: number;
+  completedStages: number;
+  totalStages: number;
+  projectProgressPercent: number;
+}>;
+
+export type ActivityTypeCounts = Readonly<Record<ActivityEventType, number>>;
+
+export type ActivityStats = Readonly<{
+  totalActivities: number;
+  last7DaysActivityCount: number;
+  eventTypeCounts: ActivityTypeCounts;
+  last7DaysEventTypeCounts: ActivityTypeCounts;
+}>;
+
 type LearningStatsSource = Pick<
   UserProgress,
   'lastActivity' | 'lessons' | 'projects' | 'quizHistory' | 'quizzes' | 'totalXp'
@@ -105,6 +125,7 @@ type LearningStatsSource = Pick<
 
 type CategoryProgressSource = Pick<UserProgress, 'lessons'>;
 type QuizStatsSource = Pick<UserProgress, 'quizzes' | 'quizHistory'>;
+type ActivityStatsSource = Readonly<{ activityHistory?: readonly ActivityEvent[] }>;
 
 type LearningStatsContent = Readonly<{
   lessons: readonly Lesson[];
@@ -113,6 +134,13 @@ type LearningStatsContent = Readonly<{
 }>;
 
 const defaultContent: LearningStatsContent = { lessons, projects, quizzes };
+
+const ACTIVITY_EVENT_TYPES = [
+  'lesson_completed',
+  'quiz_completed',
+  'quiz_retry',
+  'project_progress',
+] as const satisfies readonly ActivityEventType[];
 
 function percentage(completed: number, total: number): number {
   return total > 0 ? Math.round((completed / total) * 100) : 0;
@@ -134,6 +162,19 @@ function isCompleted(value: unknown): boolean {
 
 function uniqueIds<T extends string>(values: readonly T[]): ReadonlySet<T> {
   return new Set(values);
+}
+
+function emptyActivityTypeCounts(): Record<ActivityEventType, number> {
+  return {
+    lesson_completed: 0,
+    quiz_completed: 0,
+    quiz_retry: 0,
+    project_progress: 0,
+  };
+}
+
+function uniqueProjects(projectCatalog: readonly Project[]): readonly Project[] {
+  return [...new Map(projectCatalog.map((project) => [project.id, project])).values()];
 }
 
 function getLatestActivity(
@@ -261,6 +302,94 @@ export function getCategoryProgress(
       completionRate: completionPercent,
     };
   });
+}
+
+export function getProjectStats(
+  projectCatalog: readonly Project[] = projects,
+): ProjectStats {
+  const uniqueCatalog = uniqueProjects(projectCatalog);
+  const stages = uniqueCatalog.flatMap((project) => (
+    [...new Map(project.stages.map((stage) => [stage.id, stage])).values()]
+  ));
+  const completedStages = stages.filter((stage) => stage.status === 'completed').length;
+
+  return {
+    totalProjects: uniqueCatalog.length,
+    completedProjects: uniqueCatalog.filter((project) => project.status === 'completed').length,
+    inProgressProjects: uniqueCatalog.filter((project) => project.status === 'in-progress').length,
+    completedStages,
+    totalStages: stages.length,
+    projectProgressPercent: percentage(completedStages, stages.length),
+  };
+}
+
+function isActivityEventType(value: unknown): value is ActivityEventType {
+  return ACTIVITY_EVENT_TYPES.some((type) => type === value);
+}
+
+function validActivityEvents(source: ActivityStatsSource): readonly ActivityEvent[] {
+  if (!Array.isArray(source.activityHistory)) return [];
+
+  return source.activityHistory.filter((event) => (
+    typeof event === 'object'
+    && event !== null
+    && isActivityEventType(event.type)
+    && Number.isFinite(event.timestamp)
+  ));
+}
+
+function countActivityTypes(events: readonly ActivityEvent[]): ActivityTypeCounts {
+  return events.reduce((counts, event) => {
+    counts[event.type] += 1;
+    return counts;
+  }, emptyActivityTypeCounts());
+}
+
+function getLocalSevenDayStart(now: number): number {
+  const start = new Date(now);
+  start.setHours(0, 0, 0, 0);
+  start.setDate(start.getDate() - 6);
+  return start.getTime();
+}
+
+export function getActivityStats(
+  source: ActivityStatsSource = {},
+  now: number = Date.now(),
+): ActivityStats {
+  const events = validActivityEvents(source);
+  const validNow = Number.isFinite(now) ? now : 0;
+  const sevenDayStart = getLocalSevenDayStart(validNow);
+  const last7DaysEvents = events.filter((event) => (
+    event.timestamp >= sevenDayStart && event.timestamp <= validNow
+  ));
+
+  return {
+    totalActivities: events.length,
+    last7DaysActivityCount: last7DaysEvents.length,
+    eventTypeCounts: countActivityTypes(events),
+    last7DaysEventTypeCounts: countActivityTypes(last7DaysEvents),
+  };
+}
+
+export function getOverallProgress(
+  progress: Pick<UserProgress, 'lessons' | 'quizzes'>,
+  content: LearningStatsContent = defaultContent,
+): number {
+  const uniqueLessonCatalog = [...new Map(
+    content.lessons.map((lesson) => [lesson.id, lesson]),
+  ).values()];
+  const uniqueQuizCatalog = [...new Map(
+    content.quizzes.map((quiz) => [quiz.id, quiz]),
+  ).values()];
+  const projectStats = getProjectStats(content.projects);
+  const completedUnits = getCompletedLessonIds(progress.lessons, uniqueLessonCatalog).size
+    + getCompletedQuizIds(progress.quizzes, uniqueQuizCatalog).size
+    + projectStats.completedStages;
+  const totalUnits = uniqueLessonCatalog.length
+    + uniqueQuizCatalog.length
+    + projectStats.totalStages;
+
+  return percentage(completedUnits, totalUnits);
 }
 
 function isValidAttempt(attempt: QuizAttempt, knownQuizIds: ReadonlySet<QuizId>): boolean {
