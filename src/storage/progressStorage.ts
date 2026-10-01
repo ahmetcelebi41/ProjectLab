@@ -4,6 +4,7 @@ import { createJSONStorage } from 'zustand/middleware';
 import { achievementsById, lessonsById, projectsById, quizzesById } from '@/data';
 import {
   PROGRESS_SCHEMA_VERSION,
+  type ActivityEvent,
   type AchievementId,
   type LastActivity,
   type LessonId,
@@ -19,9 +20,10 @@ import {
 
 export const PROGRESS_STORAGE_KEY = '@projectlab/progress';
 
-// Zustand envelope version. V1.0 already used 2, so 3 is required to make
-// Zustand invoke the V1 -> UserProgress schemaVersion 2 migration.
-export const PROGRESS_STORAGE_VERSION = 3;
+// Zustand envelope version. Incrementing it makes Zustand invoke the additive
+// UserProgress schemaVersion 2 -> 3 migration without changing the envelope shape.
+export const PROGRESS_STORAGE_VERSION = 4;
+export const MAX_PERSISTED_ACTIVITY_EVENTS = 100;
 
 export type PersistedProgressState = UserProgress;
 
@@ -33,6 +35,7 @@ const emptyProgress: UserProgress = {
   quizzes: [],
   quizHistory: [],
   lastActivity: null,
+  activityHistory: [],
   earnedAchievementIds: [],
 };
 
@@ -122,6 +125,26 @@ function isLastActivity(value: unknown): value is LastActivity {
     || (value.type === 'quiz' && isQuizId(value.quizId));
 }
 
+function isActivityEvent(value: unknown): value is ActivityEvent {
+  return isRecord(value)
+    && typeof value.id === 'string'
+    && (value.type === 'lesson_completed'
+      || value.type === 'quiz_completed'
+      || value.type === 'quiz_retry'
+      || value.type === 'project_progress')
+    && typeof value.entityId === 'string'
+    && isFiniteNumber(value.timestamp)
+    && (value.metadata === undefined || isRecord(value.metadata));
+}
+
+export function normalizeActivityHistory(value: unknown): readonly ActivityEvent[] {
+  if (!Array.isArray(value) || !value.every(isActivityEvent)) return [];
+
+  return [...value]
+    .sort((left, right) => right.timestamp - left.timestamp)
+    .slice(0, MAX_PERSISTED_ACTIVITY_EVENTS);
+}
+
 export function isUserProgress(value: unknown): value is UserProgress {
   return isRecord(value)
     && value.schemaVersion === PROGRESS_SCHEMA_VERSION
@@ -135,6 +158,9 @@ export function isUserProgress(value: unknown): value is UserProgress {
     && Array.isArray(value.quizHistory)
     && value.quizHistory.every(isQuizAttempt)
     && (value.lastActivity === null || isLastActivity(value.lastActivity))
+    && Array.isArray(value.activityHistory)
+    && value.activityHistory.length <= MAX_PERSISTED_ACTIVITY_EVENTS
+    && value.activityHistory.every(isActivityEvent)
     && Array.isArray(value.earnedAchievementIds)
     && value.earnedAchievementIds.every(isAchievementId);
 }
@@ -226,7 +252,7 @@ export function migrateProgressState(
   assertSupportedSchema(persistedState);
 
   const legacy = isRecord(persistedState) ? persistedState : {};
-  const isPartialV2 = legacy.schemaVersion === PROGRESS_SCHEMA_VERSION;
+  const isV2OrNewer = legacy.schemaVersion === 2 || legacy.schemaVersion === PROGRESS_SCHEMA_VERSION;
   const migrated: UserProgress = {
     ...emptyProgress,
     totalXp: isFiniteNumber(legacy.totalXp) ? legacy.totalXp : emptyProgress.totalXp,
@@ -236,12 +262,15 @@ export function migrateProgressState(
     earnedAchievementIds: Array.isArray(legacy.earnedAchievementIds)
       ? legacy.earnedAchievementIds.filter(isAchievementId)
       : [],
-    quizHistory: isPartialV2 && Array.isArray(legacy.quizHistory)
+    quizHistory: isV2OrNewer && Array.isArray(legacy.quizHistory)
       ? legacy.quizHistory.filter(isQuizAttempt)
       : [],
-    lastActivity: isPartialV2 && isLastActivity(legacy.lastActivity)
+    lastActivity: isV2OrNewer && isLastActivity(legacy.lastActivity)
       ? legacy.lastActivity
       : null,
+    activityHistory: legacy.schemaVersion === PROGRESS_SCHEMA_VERSION
+      ? normalizeActivityHistory(legacy.activityHistory)
+      : [],
   };
 
   return isUserProgress(migrated) ? migrated : emptyProgress;

@@ -10,7 +10,9 @@ import {
   isSameQuizCompletionEvent,
 } from '@/features/quiz/quizAttempts';
 import {
+  MAX_PERSISTED_ACTIVITY_EVENTS,
   migrateProgressState,
+  normalizeActivityHistory,
   PROGRESS_STORAGE_KEY,
   PROGRESS_STORAGE_VERSION,
   progressStorage,
@@ -50,13 +52,9 @@ type ProgressActions = {
   setHasHydrated: (hasHydrated: boolean) => void;
 };
 
-export type ProgressStore = UserProgress &
-  ProgressActions & {
-    activityHistory: readonly ActivityEvent[];
-    hasHydrated: boolean;
-  };
+export type ProgressStore = UserProgress & ProgressActions & { hasHydrated: boolean };
 
-export const MAX_ACTIVITY_HISTORY_EVENTS = 100;
+export const MAX_ACTIVITY_HISTORY_EVENTS = MAX_PERSISTED_ACTIVITY_EVENTS;
 
 const initialProgress: UserProgress = {
   schemaVersion: PROGRESS_SCHEMA_VERSION,
@@ -66,6 +64,7 @@ const initialProgress: UserProgress = {
   quizzes: [],
   quizHistory: [],
   lastActivity: null,
+  activityHistory: [],
   earnedAchievementIds: [],
 };
 
@@ -111,7 +110,6 @@ export const useProgressStore = create<ProgressStore>()(
 
       return {
         ...initialProgress,
-        activityHistory: [],
         hasHydrated: false,
 
         addActivityEvent: (event) => {
@@ -265,6 +263,10 @@ export const useProgressStore = create<ProgressStore>()(
       version: PROGRESS_STORAGE_VERSION,
       storage: progressStorage,
       migrate: migrateProgressState,
+      merge: (persistedState, currentState) => ({
+        ...currentState,
+        ...migrateProgressState(persistedState, PROGRESS_STORAGE_VERSION),
+      }),
       partialize: (state): PersistedProgressState => ({
         schemaVersion: state.schemaVersion,
         totalXp: state.totalXp,
@@ -273,6 +275,7 @@ export const useProgressStore = create<ProgressStore>()(
         quizzes: state.quizzes,
         quizHistory: state.quizHistory,
         lastActivity: state.lastActivity,
+        activityHistory: normalizeActivityHistory(state.activityHistory),
         earnedAchievementIds: state.earnedAchievementIds,
       }),
       onRehydrateStorage: () => (state) => {

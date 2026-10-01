@@ -10,7 +10,11 @@ import {
 import { getLevelProgress } from '@/features/progress/level';
 import { isLessonCompleted } from '@/features/progress/lessonProgress';
 import { useProgressStore } from '@/stores/progressStore';
-import { PROGRESS_SCHEMA_VERSION, type UserProgress } from '@/types';
+import {
+  PROGRESS_SCHEMA_VERSION,
+  type ActivityEvent,
+  type UserProgress,
+} from '@/types';
 
 import {
   isUserProgress,
@@ -30,6 +34,7 @@ function createV2State(overrides: Partial<UserProgress> = {}): UserProgress {
     quizzes: [],
     quizHistory: [],
     lastActivity: null,
+    activityHistory: [],
     earnedAchievementIds: [],
     ...overrides,
   };
@@ -58,10 +63,131 @@ describe('progress storage migration', () => {
     jest.clearAllMocks();
   });
 
-  it('uses schema version 2 without changing the existing storage key', () => {
-    expect(PROGRESS_SCHEMA_VERSION).toBe(2);
+  it('uses schema version 3 without changing the existing storage key', () => {
+    expect(PROGRESS_SCHEMA_VERSION).toBe(3);
     expect(PROGRESS_STORAGE_KEY).toBe('@projectlab/progress');
-    expect(PROGRESS_STORAGE_VERSION).toBe(3);
+    expect(PROGRESS_STORAGE_VERSION).toBe(4);
+  });
+
+  it('additively migrates a V1.2 persisted state and preserves progress data', async () => {
+    const quiz = quizzesById['design-tokens-quiz'];
+    const lastActivity = {
+      type: 'quiz',
+      quizId: quiz.id,
+      occurredAt: completedAt,
+    } as const;
+    const v2State = {
+      schemaVersion: 2,
+      totalXp: 187,
+      projects: [{ projectId: 'nova', lastVisitedAt: completedAt }],
+      lessons: [{
+        lessonId: 'design-tokens',
+        lastBlockId: 'token-taxonomy',
+        completedAt,
+      }],
+      quizzes: [{
+        quizId: quiz.id,
+        currentQuestionIndex: 2,
+        answers: [],
+        bestCorrectAnswerCount: 2,
+        awardedXp: 10,
+        completedAt,
+      }],
+      quizHistory: [{
+        quizId: quiz.id,
+        completedAt,
+        correctAnswerCount: 2,
+        questionCount: 3,
+        wrongQuestionIds: [quiz.questions[2].id],
+      }],
+      lastActivity,
+      earnedAchievementIds: ['first-lesson'],
+    };
+    await writePersistedState(v2State, 3);
+
+    await useProgressStore.persist.rehydrate();
+
+    const state = useProgressStore.getState();
+    expect(state.schemaVersion).toBe(3);
+    expect(state.totalXp).toBe(187);
+    expect(getLevelProgress(state.totalXp).level).toBe(getLevelProgress(187).level);
+    expect(state.lessons).toEqual(v2State.lessons);
+    expect(state.quizzes).toEqual(v2State.quizzes);
+    expect(state.quizHistory).toEqual(v2State.quizHistory);
+    expect(state.projects).toEqual(v2State.projects);
+    expect(state.lastActivity).toEqual(lastActivity);
+    expect(state.earnedAchievementIds).toEqual(expect.arrayContaining(v2State.earnedAchievementIds));
+    expect(state.activityHistory).toEqual([]);
+    expect((await readPersistedEnvelope())?.version).toBe(4);
+  });
+
+  it('falls back to an empty activity history when persisted history is malformed', () => {
+    const malformed = {
+      ...createV2State({ totalXp: 31 }),
+      activityHistory: [{
+        id: 'invalid-timestamp',
+        type: 'lesson_completed',
+        entityId: 'design-tokens',
+        timestamp: '2026-09-26T00:00:00.000Z',
+      }],
+    };
+
+    const migrated = migrateProgressState(malformed, PROGRESS_STORAGE_VERSION);
+
+    expect(migrated.totalXp).toBe(31);
+    expect(migrated.activityHistory).toEqual([]);
+  });
+
+  it('persists and reloads numeric activity events', async () => {
+    const event: ActivityEvent = {
+      id: 'project_progress:nova:100',
+      type: 'project_progress',
+      entityId: 'nova',
+      timestamp: 100,
+      metadata: { stageId: 'development' },
+    };
+    useProgressStore.getState().addActivityEvent(event);
+    const partialize = useProgressStore.persist.getOptions().partialize;
+    if (!partialize) throw new Error('Progress partialize must be configured');
+    const persistedState = partialize(useProgressStore.getState());
+    resetStoreState();
+    await writePersistedState(persistedState, PROGRESS_STORAGE_VERSION);
+
+    await useProgressStore.persist.rehydrate();
+
+    expect(useProgressStore.getState().activityHistory).toEqual([event]);
+    expect(typeof useProgressStore.getState().activityHistory[0].timestamp).toBe('number');
+  });
+
+  it('normalizes persisted activity history to the newest 100 events', () => {
+    const activityHistory: ActivityEvent[] = Array.from({ length: 105 }, (_, index) => ({
+      id: `project_progress:nova:${index}`,
+      type: 'project_progress',
+      entityId: 'nova',
+      timestamp: index,
+    }));
+
+    const migrated = migrateProgressState({
+      ...createV2State(),
+      activityHistory,
+    }, PROGRESS_STORAGE_VERSION);
+
+    expect(migrated.activityHistory).toHaveLength(100);
+    expect(migrated.activityHistory[0].timestamp).toBe(104);
+    expect(migrated.activityHistory.at(-1)?.timestamp).toBe(5);
+  });
+
+  it('is idempotent after a V1.2 to V1.3 migration', () => {
+    const v2State = {
+      ...createV2State({ totalXp: 72 }),
+      schemaVersion: 2,
+    };
+
+    const firstMigration = migrateProgressState(v2State, 3);
+    const secondMigration = migrateProgressState(firstMigration, PROGRESS_STORAGE_VERSION);
+
+    expect(secondMigration).toBe(firstMigration);
+    expect(secondMigration).toEqual(firstMigration);
   });
 
   it('migrates a real schema-less V1 envelope and persists V2 only after rehydrate succeeds', async () => {
@@ -86,7 +212,7 @@ describe('progress storage migration', () => {
     await useProgressStore.persist.rehydrate();
 
     const state = useProgressStore.getState();
-    expect(state.schemaVersion).toBe(2);
+    expect(state.schemaVersion).toBe(3);
     expect(state.totalXp).toBe(137);
     expect(state.projects).toEqual([{ projectId: 'nova', lastVisitedAt: completedAt }]);
     expect(state.lessons).toEqual([{
@@ -96,6 +222,7 @@ describe('progress storage migration', () => {
     }]);
     expect(state.quizHistory).toEqual([]);
     expect(state.lastActivity).toBeNull();
+    expect(state.activityHistory).toEqual([]);
 
     const persisted = await readPersistedEnvelope();
     expect(persisted?.version).toBe(PROGRESS_STORAGE_VERSION);
@@ -422,10 +549,11 @@ describe('progress storage migration', () => {
     const migrated = migrateProgressState(legacyState, 2);
 
     expect(migrated).toMatchObject({
-      schemaVersion: 2,
+      schemaVersion: 3,
       totalXp: 243,
       quizHistory: [],
       lastActivity: null,
+      activityHistory: [],
     });
     expect(migrated.quizzes[0].awardedXp).toBe(quiz.completionXp);
     expect(isUserProgress(migrated)).toBe(true);
@@ -469,18 +597,19 @@ describe('progress storage migration', () => {
     await useProgressStore.persist.rehydrate();
 
     expect(useProgressStore.getState()).toMatchObject({
-      schemaVersion: 2,
+      schemaVersion: 3,
       totalXp: 0,
       projects: [],
       lessons: [],
       quizzes: [],
       quizHistory: [],
       lastActivity: null,
+      activityHistory: [],
       earnedAchievementIds: [],
     });
   });
 
-  it('returns an already valid schema version 2 state without transforming it', () => {
+  it('returns an already valid schema version 3 state without transforming it', () => {
     const v2State = createV2State({
       totalXp: 99,
       quizHistory: [{
@@ -510,7 +639,7 @@ describe('progress storage migration', () => {
   it('preserves an unknown future schema instead of silently downgrading it', async () => {
     const futureState = {
       ...createV2State({ totalXp: 500 }),
-      schemaVersion: 3,
+      schemaVersion: 4,
       futureOnlyField: { keep: true },
     };
     const futureRaw = JSON.stringify({
@@ -520,13 +649,13 @@ describe('progress storage migration', () => {
     await AsyncStorage.setItem(PROGRESS_STORAGE_KEY, futureRaw);
 
     expect(() => migrateProgressState(futureState, PROGRESS_STORAGE_VERSION)).toThrow(
-      'Unsupported progress schema version: 3',
+      'Unsupported progress schema version: 4',
     );
     await expect(useProgressStore.persist.rehydrate()).resolves.toBeUndefined();
 
     expect(await AsyncStorage.getItem(PROGRESS_STORAGE_KEY)).toBe(futureRaw);
     expect(useProgressStore.getState()).toMatchObject({
-      schemaVersion: 2,
+      schemaVersion: 3,
       totalXp: 0,
       hasHydrated: false,
     });
@@ -567,11 +696,12 @@ describe('progress storage migration', () => {
 
     expect(await AsyncStorage.getItem(PROGRESS_STORAGE_KEY)).toBe(malformedRaw);
     expect(useProgressStore.getState()).toMatchObject({
-      schemaVersion: 2,
+      schemaVersion: 3,
       totalXp: 0,
       lessons: [],
       quizHistory: [],
       lastActivity: null,
+      activityHistory: [],
     });
   });
 });

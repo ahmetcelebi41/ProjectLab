@@ -67,7 +67,7 @@ describe('progressStore', () => {
     useProgressStore.getState().resetProgress();
 
     const state = useProgressStore.getState();
-    expect(state.schemaVersion).toBe(2);
+    expect(state.schemaVersion).toBe(3);
     expect(state.lessons).toEqual([]);
     expect(state.quizHistory).toEqual([]);
     expect(state.lastActivity).toBeNull();
@@ -144,12 +144,12 @@ describe('progressStore', () => {
 
     const persisted = partialize(useProgressStore.getState());
     expect(persisted).toMatchObject({
-      schemaVersion: 2,
+      schemaVersion: 3,
       lessons: [],
       quizHistory,
       lastActivity,
+      activityHistory: [],
     });
-    expect(persisted).not.toHaveProperty('activityHistory');
   });
 
   it('ders XP sini yalniz ilk tamamlamada ekler', () => {

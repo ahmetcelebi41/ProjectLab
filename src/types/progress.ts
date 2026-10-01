@@ -3,7 +3,7 @@ import type { LessonId } from './lesson';
 import type { ProjectId } from './project';
 import type { QuizId } from './quiz';
 
-export const PROGRESS_SCHEMA_VERSION = 2 as const;
+export const PROGRESS_SCHEMA_VERSION = 3 as const;
 
 export type ProgressSchemaVersion = typeof PROGRESS_SCHEMA_VERSION;
 
@@ -83,4 +83,5 @@ export type UserProgress = Progress & Readonly<{
   schemaVersion: ProgressSchemaVersion;
   quizHistory: readonly QuizAttempt[];
   lastActivity: LastActivity | null;
+  activityHistory: readonly ActivityEvent[];
 }>;

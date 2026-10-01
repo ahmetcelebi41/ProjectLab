@@ -21,6 +21,7 @@ function progress(overrides: Partial<UserProgress> = {}): UserProgress {
     quizzes: [],
     quizHistory: [],
     lastActivity: null,
+    activityHistory: [],
     earnedAchievementIds: [],
     ...overrides,
   };
