@@ -154,6 +154,8 @@ describe('progressStore', () => {
 
   it('ders XP sini yalniz ilk tamamlamada ekler', () => {
     const store = useProgressStore.getState();
+    const lastActivity = { type: 'lesson', lessonId: 'api-contracts', occurredAt: completedAt } as const;
+    useProgressStore.setState({ lastActivity });
 
     store.completeLesson('design-tokens', completedAt);
     const stateAfterFirstCompletion = useProgressStore.getState();
@@ -163,6 +165,7 @@ describe('progressStore', () => {
     expect(state).toBe(stateAfterFirstCompletion);
     expect(state.totalXp).toBe(lessonsById['design-tokens'].completionXp);
     expect(state.lessons).toEqual([{ lessonId: 'design-tokens', completedAt }]);
+    expect(state.lastActivity).toBe(lastActivity);
     expect(state.activityHistory).toEqual([{
       id: 'lesson_completed:design-tokens',
       type: 'lesson_completed',
@@ -243,6 +246,16 @@ describe('progressStore', () => {
     expect(state.totalXp).toBe(getQuizAwardXp(quiz, 3));
     expect(state.quizzes[0].bestCorrectAnswerCount).toBe(3);
     expect(state.quizzes[0].awardedXp).toBe(getQuizAwardXp(quiz, 3));
+    expect(state.activityHistory).toHaveLength(1);
+    expect(state.activityHistory[0]).toMatchObject({
+      type: 'quiz_completed',
+      entityId: quiz.id,
+      timestamp: Date.parse(completedAt),
+      metadata: {
+        correctAnswerCount: 3,
+        questionCount: quiz.questions.length,
+      },
+    });
   });
 
   it('daha yüksek quiz retry skorunda ek XP üretmez', () => {
@@ -284,6 +297,48 @@ describe('progressStore', () => {
       questionCount: 2,
       wrongQuestionIds: [],
     });
+    expect(state.activityHistory.map((event) => event.type)).toEqual([
+      'quiz_retry',
+      'quiz_completed',
+    ]);
+    expect(state.activityHistory[0]).toMatchObject({
+      entityId: quiz.id,
+      timestamp: Date.parse(retryCompletedAt),
+      metadata: { correctAnswerCount: 2, questionCount: 2 },
+    });
+  });
+
+  it('her benzersiz quiz retry attempti için ayrı event üretir, duplicate retry üretmez', () => {
+    const store = useProgressStore.getState();
+    store.saveQuizResult(quizResult(1));
+    const firstCompletionXp = useProgressStore.getState().totalXp;
+    const firstRetryAt = '2026-09-27T12:00:00.000Z';
+    const secondRetryAt = '2026-09-27T13:00:00.000Z';
+    const retryResult = (retryCompletedAt: string): QuizProgress => ({
+      quizId: quiz.id,
+      currentQuestionIndex: 0,
+      answers: answersFor(quiz, 1).slice(0, 1),
+      bestCorrectAnswerCount: 1,
+      completedAt: retryCompletedAt,
+    });
+
+    store.saveQuizResult(retryResult(firstRetryAt), 'retry');
+    store.saveQuizResult(retryResult(firstRetryAt), 'retry');
+    store.saveQuizResult(retryResult(secondRetryAt), 'retry');
+
+    const state = useProgressStore.getState();
+    expect(state.totalXp).toBe(firstCompletionXp);
+    expect(state.quizHistory).toHaveLength(3);
+    expect(state.activityHistory.map((event) => event.type)).toEqual([
+      'quiz_retry',
+      'quiz_retry',
+      'quiz_completed',
+    ]);
+    expect(state.activityHistory.map((event) => event.timestamp)).toEqual([
+      Date.parse(secondRetryAt),
+      Date.parse(firstRetryAt),
+      Date.parse(completedAt),
+    ]);
   });
 
   it('gecerli quiz completionlarini sirali history olarak saklar ve event duplicate etmez', () => {
@@ -293,10 +348,13 @@ describe('progressStore', () => {
 
     useProgressStore.getState().saveQuizResult(firstAttempt);
     const firstCompletionXp = useProgressStore.getState().totalXp;
+    const activityHistoryAfterFirstCompletion = useProgressStore.getState().activityHistory;
     useProgressStore.getState().saveQuizResult(firstAttempt);
     expect(useProgressStore.getState().totalXp).toBe(firstCompletionXp);
+    expect(useProgressStore.getState().activityHistory).toBe(activityHistoryAfterFirstCompletion);
     useProgressStore.getState().saveQuizResult(secondAttempt);
     expect(useProgressStore.getState().totalXp).toBe(firstCompletionXp);
+    expect(useProgressStore.getState().activityHistory).toBe(activityHistoryAfterFirstCompletion);
 
     expect(useProgressStore.getState().quizHistory).toEqual([
       {
@@ -359,6 +417,33 @@ describe('progressStore', () => {
       lastVisitedAt: completedAt,
     }]);
     expect(getCompletedProjectStageIds(projectsById.nova)).toEqual(journeyBeforeVisit);
+    expect(useProgressStore.getState().activityHistory).toEqual([]);
+  });
+
+  it('anlamlı proje milestone completion eventini bir kez kaydeder', () => {
+    const store = useProgressStore.getState();
+    store.updateProjectProgress(
+      'nova',
+      { lastVisitedAt: completedAt },
+      { milestoneId: 'architecture', completedAt },
+    );
+    const historyAfterCompletion = useProgressStore.getState().activityHistory;
+
+    useProgressStore.getState().updateProjectProgress(
+      'nova',
+      { lastVisitedAt: completedAt },
+      { milestoneId: 'architecture', completedAt: '2026-09-27T00:00:00.000Z' },
+    );
+    useProgressStore.getState().updateProjectProgress('nova', { lastVisitedAt: completedAt });
+
+    expect(useProgressStore.getState().activityHistory).toBe(historyAfterCompletion);
+    expect(historyAfterCompletion).toEqual([{
+      id: 'project_progress:nova:architecture',
+      type: 'project_progress',
+      entityId: 'nova',
+      timestamp: Date.parse(completedAt),
+      metadata: { milestoneId: 'architecture' },
+    }]);
   });
 
   it('duplicate achievement olusturmaz', () => {

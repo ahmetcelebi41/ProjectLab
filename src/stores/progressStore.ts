@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-import { achievements, lessonsById, quizzes, quizzesById } from '@/data';
+import { achievements, lessonsById, projectsById, quizzes, quizzesById } from '@/data';
 import { evaluateAchievements } from '@/features/achievements/evaluateAchievements';
 import { isLessonCompleted } from '@/features/progress/lessonProgress';
 import { getQuizAwardXp } from '@/features/progress/rewards';
@@ -20,6 +20,7 @@ import {
 } from '@/storage/progressStorage';
 import type {
   ActivityEvent,
+  ActivityEventType,
   AchievementId,
   LastActivity,
   LessonId,
@@ -35,6 +36,10 @@ import { PROGRESS_SCHEMA_VERSION } from '@/types';
 
 type LessonProgressUpdate = Readonly<Partial<Omit<LessonProgress, 'lessonId'>>>;
 type ProjectProgressUpdate = Readonly<Partial<Omit<ProjectProgress, 'projectId'>>>;
+type ProjectMilestoneCompletion = Readonly<{
+  milestoneId: string;
+  completedAt?: string;
+}>;
 type LastActivityTarget =
   | Readonly<{ type: 'lesson'; lessonId: LessonId }>
   | Readonly<{ type: 'quiz'; quizId: QuizId }>;
@@ -45,7 +50,11 @@ type ProgressActions = {
   completeLesson: (lessonId: LessonId, completedAt?: string) => void;
   setLastActivity: (activity: LastActivityTarget, updatedAt?: string) => void;
   saveQuizResult: (result: QuizProgress, attemptType?: QuizAttemptType) => void;
-  updateProjectProgress: (projectId: ProjectId, update: ProjectProgressUpdate) => void;
+  updateProjectProgress: (
+    projectId: ProjectId,
+    update: ProjectProgressUpdate,
+    completedMilestone?: ProjectMilestoneCompletion,
+  ) => void;
   setTotalXp: (totalXp: number) => void;
   unlockAchievement: (achievementId: AchievementId) => void;
   resetProgress: () => void;
@@ -89,6 +98,37 @@ function addActivityEventToHistory(
   return [event, ...activityHistory]
     .sort((left, right) => right.timestamp - left.timestamp)
     .slice(0, MAX_ACTIVITY_HISTORY_EVENTS);
+}
+
+function getNumericTimestamp(occurredAt: string): number {
+  const timestamp = Date.parse(occurredAt);
+  return Number.isFinite(timestamp) ? timestamp : Date.now();
+}
+
+function createActivityEvent(
+  type: ActivityEventType,
+  entityId: string,
+  occurredAt: string,
+  uniqueKey?: string,
+  metadata?: ActivityEvent['metadata'],
+): ActivityEvent {
+  const encodedUniqueKey = uniqueKey ? encodeURIComponent(uniqueKey) : undefined;
+  return {
+    id: [type, entityId, encodedUniqueKey].filter(Boolean).join(':'),
+    type,
+    entityId,
+    timestamp: getNumericTimestamp(occurredAt),
+    ...(metadata ? { metadata } : {}),
+  };
+}
+
+function getQuizAttemptEventKey(attempt: NonNullable<ReturnType<typeof createQuizAttempt>>): string {
+  return JSON.stringify([
+    attempt.completedAt,
+    attempt.correctAnswerCount,
+    attempt.questionCount,
+    ...attempt.wrongQuestionIds,
+  ]);
 }
 
 function getActivityTargetKey(activity: LastActivity | LastActivityTarget): string {
@@ -139,12 +179,10 @@ export const useProgressStore = create<ProgressStore>()(
             const next: LessonProgress = { ...current, lessonId, completedAt };
 
             return {
-              activityHistory: addActivityEventToHistory(state.activityHistory, {
-                id: `lesson_completed:${lessonId}`,
-                type: 'lesson_completed',
-                entityId: lessonId,
-                timestamp: Date.parse(completedAt),
-              }),
+              activityHistory: addActivityEventToHistory(
+                state.activityHistory,
+                createActivityEvent('lesson_completed', lessonId, completedAt),
+              ),
               totalXp: state.totalXp + lessonsById[lessonId].completionXp,
               lessons: replaceById(state.lessons, (item) => item.lessonId === lessonId, next),
             };
@@ -198,8 +236,23 @@ export const useProgressStore = create<ProgressStore>()(
               && !state.quizHistory.some((savedAttempt) => (
                 isSameQuizCompletionEvent(savedAttempt, attempt)
               ));
+            const activityEvent = shouldSaveAttempt && (isFirstCompletion || attemptType === 'retry')
+              ? createActivityEvent(
+                isFirstCompletion ? 'quiz_completed' : 'quiz_retry',
+                result.quizId,
+                attempt.completedAt,
+                getQuizAttemptEventKey(attempt),
+                {
+                  correctAnswerCount: attempt.correctAnswerCount,
+                  questionCount: attempt.questionCount,
+                },
+              )
+              : undefined;
 
             return {
+              activityHistory: activityEvent
+                ? addActivityEventToHistory(state.activityHistory, activityEvent)
+                : state.activityHistory,
               totalXp: isFirstCompletion
                 ? state.totalXp + (awardedXp ?? quiz.completionXp)
                 : state.totalXp,
@@ -216,7 +269,7 @@ export const useProgressStore = create<ProgressStore>()(
           evaluateCurrentAchievements();
         },
 
-        updateProjectProgress: (projectId, update) => {
+        updateProjectProgress: (projectId, update, completedMilestone) => {
           set((state) => {
             const current = state.projects.find((item) => item.projectId === projectId);
             const next: ProjectProgress = {
@@ -224,8 +277,26 @@ export const useProgressStore = create<ProgressStore>()(
               ...update,
               projectId,
             };
+            const milestoneId = completedMilestone?.milestoneId.trim();
+            const isKnownMilestone = milestoneId
+              ? projectsById[projectId].stages.some((stage) => stage.id === milestoneId)
+              : false;
+            const milestoneCompletedAt = completedMilestone?.completedAt
+              ?? new Date().toISOString();
+            const activityEvent = milestoneId && isKnownMilestone
+              ? createActivityEvent(
+                'project_progress',
+                projectId,
+                milestoneCompletedAt,
+                milestoneId,
+                { milestoneId },
+              )
+              : undefined;
 
             return {
+              activityHistory: activityEvent
+                ? addActivityEventToHistory(state.activityHistory, activityEvent)
+                : state.activityHistory,
               projects: replaceById(
                 state.projects,
                 (item) => item.projectId === projectId,
