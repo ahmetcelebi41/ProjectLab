@@ -7,6 +7,8 @@ export type {
   LessonId,
 } from './lesson';
 export type {
+  ActivityEvent,
+  ActivityEventType,
   ContentProgressStatus,
   LastActivity,
   LessonProgress,

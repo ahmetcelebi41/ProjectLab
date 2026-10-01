@@ -17,6 +17,7 @@ import {
   type PersistedProgressState,
 } from '@/storage/progressStorage';
 import type {
+  ActivityEvent,
   AchievementId,
   LastActivity,
   LessonId,
@@ -37,6 +38,7 @@ type LastActivityTarget =
   | Readonly<{ type: 'quiz'; quizId: QuizId }>;
 
 type ProgressActions = {
+  addActivityEvent: (event: ActivityEvent) => void;
   updateLessonProgress: (lessonId: LessonId, update: LessonProgressUpdate) => void;
   completeLesson: (lessonId: LessonId, completedAt?: string) => void;
   setLastActivity: (activity: LastActivityTarget, updatedAt?: string) => void;
@@ -50,8 +52,11 @@ type ProgressActions = {
 
 export type ProgressStore = UserProgress &
   ProgressActions & {
+    activityHistory: readonly ActivityEvent[];
     hasHydrated: boolean;
   };
+
+export const MAX_ACTIVITY_HISTORY_EVENTS = 100;
 
 const initialProgress: UserProgress = {
   schemaVersion: PROGRESS_SCHEMA_VERSION,
@@ -76,6 +81,17 @@ function replaceById<T>(
   return items.map((item, itemIndex) => (itemIndex === index ? nextItem : item));
 }
 
+function addActivityEventToHistory(
+  activityHistory: readonly ActivityEvent[],
+  event: ActivityEvent,
+): readonly ActivityEvent[] {
+  if (activityHistory.some((item) => item.id === event.id)) return activityHistory;
+
+  return [event, ...activityHistory]
+    .sort((left, right) => right.timestamp - left.timestamp)
+    .slice(0, MAX_ACTIVITY_HISTORY_EVENTS);
+}
+
 function getActivityTargetKey(activity: LastActivity | LastActivityTarget): string {
   return activity.type === 'lesson'
     ? `${activity.type}:${activity.lessonId}`
@@ -95,7 +111,15 @@ export const useProgressStore = create<ProgressStore>()(
 
       return {
         ...initialProgress,
+        activityHistory: [],
         hasHydrated: false,
+
+        addActivityEvent: (event) => {
+          set((state) => {
+            const activityHistory = addActivityEventToHistory(state.activityHistory, event);
+            return activityHistory === state.activityHistory ? state : { activityHistory };
+          });
+        },
 
         updateLessonProgress: (lessonId, update) => {
           set((state) => {
@@ -117,6 +141,12 @@ export const useProgressStore = create<ProgressStore>()(
             const next: LessonProgress = { ...current, lessonId, completedAt };
 
             return {
+              activityHistory: addActivityEventToHistory(state.activityHistory, {
+                id: `lesson_completed:${lessonId}`,
+                type: 'lesson_completed',
+                entityId: lessonId,
+                timestamp: Date.parse(completedAt),
+              }),
               totalXp: state.totalXp + lessonsById[lessonId].completionXp,
               lessons: replaceById(state.lessons, (item) => item.lessonId === lessonId, next),
             };
@@ -223,7 +253,7 @@ export const useProgressStore = create<ProgressStore>()(
           });
         },
 
-        resetProgress: () => set(initialProgress),
+        resetProgress: () => set({ ...initialProgress, activityHistory: [] }),
         setHasHydrated: (hasHydrated) => {
           set({ hasHydrated });
           if (hasHydrated) evaluateCurrentAchievements();

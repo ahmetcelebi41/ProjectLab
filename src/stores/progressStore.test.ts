@@ -8,7 +8,7 @@ import {
   type QuizProgress,
 } from '@/types';
 
-import { useProgressStore } from './progressStore';
+import { MAX_ACTIVITY_HISTORY_EVENTS, useProgressStore } from './progressStore';
 
 const completedAt = '2026-09-26T00:00:00.000Z';
 const quiz = quizzesById['design-tokens-quiz'];
@@ -46,6 +46,7 @@ describe('progressStore', () => {
       quizzes: [],
       quizHistory: [],
       lastActivity: null,
+      activityHistory: [],
       earnedAchievementIds: [],
       hasHydrated: false,
     });
@@ -70,6 +71,60 @@ describe('progressStore', () => {
     expect(state.lessons).toEqual([]);
     expect(state.quizHistory).toEqual([]);
     expect(state.lastActivity).toBeNull();
+    expect(state.activityHistory).toEqual([]);
+  });
+
+  it('yeni activity eventini en basa ekler ve mevcut sirayi korur', () => {
+    const firstEvent = {
+      id: 'quiz_retry:design-tokens-quiz:1',
+      type: 'quiz_retry',
+      entityId: 'design-tokens-quiz',
+      timestamp: 1,
+    } as const;
+    const secondEvent = {
+      id: 'quiz_retry:design-tokens-quiz:2',
+      type: 'quiz_retry',
+      entityId: 'design-tokens-quiz',
+      timestamp: 2,
+      metadata: { correctAnswerCount: 3 },
+    } as const;
+
+    useProgressStore.getState().addActivityEvent(secondEvent);
+    useProgressStore.getState().addActivityEvent(firstEvent);
+
+    expect(useProgressStore.getState().activityHistory).toEqual([secondEvent, firstEvent]);
+  });
+
+  it('activity history icin en yeni 100 eventi korur', () => {
+    for (let index = 0; index <= MAX_ACTIVITY_HISTORY_EVENTS; index += 1) {
+      useProgressStore.getState().addActivityEvent({
+        id: `project_progress:nova:${index}`,
+        type: 'project_progress',
+        entityId: 'nova',
+        timestamp: index,
+      });
+    }
+
+    const history = useProgressStore.getState().activityHistory;
+    expect(history).toHaveLength(MAX_ACTIVITY_HISTORY_EVENTS);
+    expect(history[0].timestamp).toBe(MAX_ACTIVITY_HISTORY_EVENTS);
+    expect(history.at(-1)?.timestamp).toBe(1);
+  });
+
+  it('ayni id ile activity eventini duplicate etmez', () => {
+    const event = {
+      id: 'quiz_completed:design-tokens-quiz:1',
+      type: 'quiz_completed',
+      entityId: 'design-tokens-quiz',
+      timestamp: 1,
+    } as const;
+
+    useProgressStore.getState().addActivityEvent(event);
+    const history = useProgressStore.getState().activityHistory;
+    useProgressStore.getState().addActivityEvent(event);
+
+    expect(useProgressStore.getState().activityHistory).toBe(history);
+    expect(history).toEqual([event]);
   });
 
   it('V1.1 alanlarini persisted state kapsaminda tutar', () => {
@@ -94,6 +149,7 @@ describe('progressStore', () => {
       quizHistory,
       lastActivity,
     });
+    expect(persisted).not.toHaveProperty('activityHistory');
   });
 
   it('ders XP sini yalniz ilk tamamlamada ekler', () => {
@@ -107,6 +163,12 @@ describe('progressStore', () => {
     expect(state).toBe(stateAfterFirstCompletion);
     expect(state.totalXp).toBe(lessonsById['design-tokens'].completionXp);
     expect(state.lessons).toEqual([{ lessonId: 'design-tokens', completedAt }]);
+    expect(state.activityHistory).toEqual([{
+      id: 'lesson_completed:design-tokens',
+      type: 'lesson_completed',
+      entityId: 'design-tokens',
+      timestamp: Date.parse(completedAt),
+    }]);
   });
 
   it('mevcut progress verisini ilk ders tamamlamasinda korur', () => {

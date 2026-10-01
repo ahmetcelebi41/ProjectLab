@@ -45,6 +45,20 @@ export type QuizAttempt = Readonly<{
   wrongQuestionIds: readonly string[];
 }>;
 
+export type ActivityEventType =
+  | 'lesson_completed'
+  | 'quiz_completed'
+  | 'quiz_retry'
+  | 'project_progress';
+
+export type ActivityEvent = Readonly<{
+  id: string;
+  type: ActivityEventType;
+  entityId: string;
+  timestamp: number;
+  metadata?: Readonly<Record<string, unknown>>;
+}>;
+
 export type LastActivity =
   | Readonly<{
     type: 'lesson';
